@@ -191,6 +191,124 @@ bool CreateTestMesh()
     }
 }
 
+// =============== Создание MESH из точек (для пользователя) ===============
+bool CreateMeshFromPoints(const GS::Array<API_Coord3D>& points)
+{
+    Log("[ShellHelper] CreateMeshFromPoints: START with %d points", (int)points.GetSize());
+    
+    const UIndex numPoints = points.GetSize();
+    if (numPoints != 3) {
+        Log("[ShellHelper] ERROR: Нужно ровно 3 точки для создания MESH");
+        return false;
+    }
+    
+    // Создаем MESH элемент
+    API_Element element = {};
+    element.header.type = API_MeshID;
+    GSErrCode err = ACAPI_Element_GetDefaults(&element, nullptr);
+    if (err != NoError) {
+        Log("[ShellHelper] ERROR: ACAPI_Element_GetDefaults failed, err=%d", (int)err);
+        return false;
+    }
+    
+    // Настройки для 3 точек
+    element.mesh.poly.nCoords = 3;
+    element.mesh.poly.nSubPolys = 1;
+    element.mesh.poly.nArcs = 0;
+    
+    Log("[ShellHelper] MESH настройки: nCoords=3, nSubPolys=1, nArcs=0");
+    
+    // Создаем memo
+    API_ElementMemo memo = {};
+    memo.coords = reinterpret_cast<API_Coord**>(BMAllocateHandle(4 * sizeof(API_Coord), ALLOCATE_CLEAR, 0));
+    memo.pends = reinterpret_cast<Int32**>(BMAllocateHandle(2 * sizeof(Int32), ALLOCATE_CLEAR, 0));
+    memo.parcs = reinterpret_cast<API_PolyArc**>(BMAllocateHandle(0 * sizeof(API_PolyArc), ALLOCATE_CLEAR, 0));
+    memo.meshPolyZ = reinterpret_cast<double**>(BMAllocateHandle(4 * sizeof(double), ALLOCATE_CLEAR, 0));
+    
+    // Заполняем координаты и Z
+    (*memo.coords)[1] = {points[0].x, points[0].y};
+    (*memo.coords)[2] = {points[1].x, points[1].y};
+    (*memo.coords)[3] = {points[2].x, points[2].y};
+    (*memo.coords)[0] = (*memo.coords)[1]; // Заглушка для элемента 0
+    (*memo.coords)[element.mesh.poly.nCoords] = (*memo.coords)[1]; // Замыкаем треугольник
+    
+    (*memo.pends)[1] = 4; // nCoords + 1 (последняя точка = первая)
+    
+    (*memo.meshPolyZ)[1] = points[0].z;
+    (*memo.meshPolyZ)[2] = points[1].z;
+    (*memo.meshPolyZ)[3] = points[2].z;
+    (*memo.meshPolyZ)[0] = points[0].z; // Заглушка для элемента 0
+    (*memo.meshPolyZ)[4] = points[0].z; // Замыкаем Z-координаты
+    
+    Log("[ShellHelper] MESH: точки заполнены");
+    
+    // Создаем MESH
+    err = ACAPI_Element_Create(&element, &memo);
+    if (err == APIERR_IRREGULARPOLY) {
+        Log("[ShellHelper] Полигон нерегулярный, регуляризуем...");
+        
+        API_RegularizedPoly poly = {};
+        poly.coords = memo.coords;
+        poly.pends = memo.pends;
+        poly.parcs = memo.parcs;
+        poly.vertexIDs = memo.vertexIDs;
+        poly.needVertexAncestry = 1;
+        
+        Int32 nResult = 0;
+        API_RegularizedPoly** polys = nullptr;
+        GSErrCode regErr = ACAPI_Polygon_RegularizePolygon(&poly, &nResult, &polys);
+        
+        if (regErr != NoError) {
+            Log("[ShellHelper] ERROR: ACAPI_Polygon_RegularizePolygon failed, err=%d", (int)regErr);
+            ACAPI_DisposeElemMemoHdls(&memo);
+            return false;
+        }
+        
+        if (regErr == NoError) {
+            Log("[ShellHelper] Регуляризация успешна, создаем %d полигонов", (int)nResult);
+            
+            for (Int32 i = 0; i < nResult && err == NoError; i++) {
+                element.mesh.poly.nCoords = BMhGetSize(reinterpret_cast<GSHandle>((*polys)[i].coords)) / sizeof(API_Coord) - 1;
+                element.mesh.poly.nSubPolys = BMhGetSize(reinterpret_cast<GSHandle>((*polys)[i].pends)) / sizeof(Int32) - 1;
+                element.mesh.poly.nArcs = BMhGetSize(reinterpret_cast<GSHandle>((*polys)[i].parcs)) / sizeof(API_PolyArc);
+                
+                API_ElementMemo tmpMemo = {};
+                tmpMemo.coords = (*polys)[i].coords;
+                tmpMemo.pends = (*polys)[i].pends;
+                tmpMemo.parcs = (*polys)[i].parcs;
+                tmpMemo.vertexIDs = (*polys)[i].vertexIDs;
+                
+                tmpMemo.meshPolyZ = reinterpret_cast<double**>(BMAllocateHandle((element.mesh.poly.nCoords + 1) * sizeof(double), ALLOCATE_CLEAR, 0));
+                if (tmpMemo.meshPolyZ != nullptr) {
+                    for (Int32 j = 1; j <= element.mesh.poly.nCoords; j++) {
+                        if (j <= 3) {
+                            (*tmpMemo.meshPolyZ)[j] = (*memo.meshPolyZ)[j];
+                        } else {
+                            (*tmpMemo.meshPolyZ)[j] = 0.0;
+                        }
+                    }
+                    
+                    err = ACAPI_Element_Create(&element, &tmpMemo);
+                    if (err != NoError) {
+                        Log("[ShellHelper] ERROR: ACAPI_Element_Create piece %d failed, err=%d", (int)i, (int)err);
+                    }
+                    BMKillHandle(reinterpret_cast<GSHandle*>(&tmpMemo.meshPolyZ));
+                }
+            }
+        }
+    }
+    
+    if (err == NoError) {
+        Log("[ShellHelper] SUCCESS: MESH создан из %d точек!", (int)numPoints);
+        ACAPI_DisposeElemMemoHdls(&memo);
+        return true;
+    } else {
+        Log("[ShellHelper] ERROR: Не удалось создать MESH, err=%d", (int)err);
+        ACAPI_DisposeElemMemoHdls(&memo);
+        return false;
+    }
+}
+
 // =============== Основная функция создания оболочки ===============
 bool CreateShellFromLine(double widthMM, double stepMM)
 {

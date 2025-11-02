@@ -986,6 +986,34 @@
       }
     }
 
+    // ================= MESH CREATION =================
+    async function CreateMeshFrom3PointsUI() {
+      const A = window.ACAPI;
+      if (!A) { AddLog('[UI] ACAPI unavailable'); return; }
+
+      AddLog('[UI] Creating mesh from 3 points');
+      setInfo("info-mesh", "Click 3 points on the plan...");
+
+      if (typeof A.CreateMeshFrom3Points === 'function') {
+        try {
+          const success = await A.CreateMeshFrom3Points();
+          if (success) {
+            AddLog('[UI] ✅ Mesh created successfully');
+            setInfo("info-mesh", "✅ Mesh created successfully");
+          } else {
+            AddLog('[UI] ❌ Error creating mesh');
+            setInfo("info-mesh", "❌ Error creating mesh");
+          }
+        } catch (err) {
+          AddLog('[UI] ❌ Error calling CreateMeshFrom3Points: ' + err);
+          setInfo("info-mesh", "❌ Error: " + err);
+        }
+      } else {
+        AddLog('[UI] ❌ Function CreateMeshFrom3Points is unavailable');
+        setInfo("info-mesh", "❌ Function unavailable (update the plugin)");
+      }
+    }
+
     // ================= MORPH CREATION =================
     async function CreateMorphUI() {
       const A = window.ACAPI;
@@ -1201,6 +1229,7 @@
     <button class="tablink" onclick="openTab(event,'tab-ground')">Grounding</button>
     <button class="tablink" onclick="openTab(event,'tab-markup')">Markup</button>
     <button class="tablink" onclick="openTab(event,'tab-shell')">Contours</button>
+    <button class="tablink" onclick="openTab(event,'tab-mesh')">Mesh</button>
     <button class="tablink" onclick="openTab(event,'tab-morph')">Morph</button>
     <button class="tablink" onclick="openTab(event,'tab-id')">ID</button>
     <button class="tablink" onclick="openTab(event,'tab-layers')">Layers</button>
@@ -1382,6 +1411,33 @@
     <button class="tab-help"
             data-help-url="https://landscape.227.info/help/shell"
             data-help-title="Help: Contours">Help</button>
+  </div>
+
+  <!-- Mesh -->
+  <div id="tab-mesh" class="tabcontent">
+    <fieldset class="control-block">
+      <legend>Create Mesh from 3 Points</legend>
+
+      <div style="text-align:center; margin-top:15px;">
+        <input type="button" 
+               onclick="whenACAPIReadyDo(CreateMeshFrom3PointsUI)" 
+               value="Create Mesh"
+               style="font-size:16px; padding:8px 20px; font-weight:bold; background:#4F604F; color:white; border:none; border-radius:4px; cursor:pointer;">
+      </div>
+
+      <div id="info-mesh" class="info-box">
+        Creates a Mesh element (triangle) from 3 points specified by the user on the plan.<br>
+        <strong>Workflow:</strong><br>
+        1. Click "Create Mesh" button<br>
+        2. Select 3 points on the plan with mouse (pencil cursor will appear)<br>
+        3. Mesh will be created as a triangle from these 3 points<br><br>
+        <strong>Note:</strong> This creates a simple Mesh element, not Morph. Z-coordinate is set to 0.0 (on plan level).
+      </div>
+    </fieldset>
+
+    <button class="tab-help"
+            data-help-url="https://landscape.227.info/help/mesh"
+            data-help-title="Help: Mesh">Help</button>
   </div>
 
   <!-- Morph -->

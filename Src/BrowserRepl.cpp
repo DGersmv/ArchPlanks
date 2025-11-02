@@ -628,6 +628,59 @@ void BrowserRepl::RegisterACAPIJavaScriptObject()
 		return new JS::Value(err == NoError && success);
 		}));
 
+	// --- Mesh API (создание Mesh из 3 точек) ---
+	jsACAPI->AddItem(new JS::Function("CreateMeshFrom3Points", [](GS::Ref<JS::Base>) {
+		if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] CreateMeshFrom3Points() - создание Mesh из 3 точек");
+		
+		// Запрашиваем 3 точки у пользователя и создаём Mesh
+		bool success = false;
+		GSErrCode err = ACAPI_CallUndoableCommand("Create Mesh from 3 Points", [&]() -> GSErrCode {
+			GS::Array<API_Coord3D> points;
+			Int32 pointNum = 1;
+			
+			if (BrowserRepl::HasInstance()) {
+				BrowserRepl::GetInstance().LogToBrowser("[JS] Запрашиваем 3 точки у пользователя");
+			}
+			
+			// Ровно 3 точки
+			while (pointNum <= 3) {
+				API_GetPointType gp = {};
+				char promptBuf[256];
+				std::sprintf(promptBuf, "Mesh: укажите точку %d/3", pointNum);
+				CHTruncate(promptBuf, gp.prompt, sizeof(gp.prompt));
+				gp.changeFilter = false;
+				gp.changePlane = false;
+				
+				GSErrCode inputErr = ACAPI_UserInput_GetPoint(&gp);
+				
+				if (inputErr != NoError) {
+					if (BrowserRepl::HasInstance()) {
+						BrowserRepl::GetInstance().LogToBrowser("[JS] Отменено или ошибка при вводе точки");
+					}
+					return inputErr;
+				}
+				
+				// Фиксируем Z = 0.0 мм (на плане)
+				points.Push(API_Coord3D{gp.pos.x, gp.pos.y, 0.0});
+				pointNum++;
+			}
+			
+			if (points.GetSize() != 3) {
+				return APIERR_BADPOLY;
+			}
+			
+			// Создаём Mesh из полученных точек через ShellHelper
+			success = ShellHelper::CreateMeshFromPoints(points);
+			if (!success) {
+				return APIERR_BADPOLY;
+			}
+			
+			return NoError;
+		});
+		
+		return new JS::Value(err == NoError && success);
+		}));
+
 	// --- Create Morph from Contour ---
 	jsACAPI->AddItem(new JS::Function("CreateMorphFromContour", [](GS::Ref<JS::Base> param) {
 		if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] CreateMorphFromContour() - создание контуров и Morph");
