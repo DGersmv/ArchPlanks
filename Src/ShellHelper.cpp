@@ -211,33 +211,31 @@ bool CreateMeshFromPoints(const GS::Array<API_Coord3D>& points)
         return false;
     }
     
-    // Настройки для 3 точек
-    element.mesh.poly.nCoords = 3;
+    // Настройки для 3 точек (4 с замыкающей)
+    element.mesh.poly.nCoords = 4;
     element.mesh.poly.nSubPolys = 1;
     element.mesh.poly.nArcs = 0;
     
-    Log("[ShellHelper] MESH настройки: nCoords=3, nSubPolys=1, nArcs=0");
+    Log("[ShellHelper] MESH настройки: nCoords=4, nSubPolys=1, nArcs=0");
     
     // Создаем memo
     API_ElementMemo memo = {};
-    memo.coords = reinterpret_cast<API_Coord**>(BMAllocateHandle(4 * sizeof(API_Coord), ALLOCATE_CLEAR, 0));
-    memo.pends = reinterpret_cast<Int32**>(BMAllocateHandle(2 * sizeof(Int32), ALLOCATE_CLEAR, 0));
-    memo.parcs = reinterpret_cast<API_PolyArc**>(BMAllocateHandle(0 * sizeof(API_PolyArc), ALLOCATE_CLEAR, 0));
-    memo.meshPolyZ = reinterpret_cast<double**>(BMAllocateHandle(4 * sizeof(double), ALLOCATE_CLEAR, 0));
+    memo.coords = reinterpret_cast<API_Coord**>(BMAllocateHandle((element.mesh.poly.nCoords + 1) * sizeof(API_Coord), ALLOCATE_CLEAR, 0));
+    memo.pends = reinterpret_cast<Int32**>(BMAllocateHandle((element.mesh.poly.nSubPolys + 1) * sizeof(Int32), ALLOCATE_CLEAR, 0));
+    memo.parcs = reinterpret_cast<API_PolyArc**>(BMAllocateHandle(element.mesh.poly.nArcs * sizeof(API_PolyArc), ALLOCATE_CLEAR, 0));
+    memo.meshPolyZ = reinterpret_cast<double**>(BMAllocateHandle((element.mesh.poly.nCoords + 1) * sizeof(double), ALLOCATE_CLEAR, 0));
     
-    // Заполняем координаты и Z
+    // Заполняем координаты и Z (3 точки + замыкающая)
     (*memo.coords)[1] = {points[0].x, points[0].y};
     (*memo.coords)[2] = {points[1].x, points[1].y};
     (*memo.coords)[3] = {points[2].x, points[2].y};
-    (*memo.coords)[0] = (*memo.coords)[1]; // Заглушка для элемента 0
-    (*memo.coords)[element.mesh.poly.nCoords] = (*memo.coords)[1]; // Замыкаем треугольник
+    (*memo.coords)[4] = {points[0].x, points[0].y}; // Замыкаем треугольник (4-я точка = 1-я)
     
-    (*memo.pends)[1] = 4; // nCoords + 1 (последняя точка = первая)
+    (*memo.pends)[1] = element.mesh.poly.nCoords; // 4
     
     (*memo.meshPolyZ)[1] = points[0].z;
     (*memo.meshPolyZ)[2] = points[1].z;
     (*memo.meshPolyZ)[3] = points[2].z;
-    (*memo.meshPolyZ)[0] = points[0].z; // Заглушка для элемента 0
     (*memo.meshPolyZ)[4] = points[0].z; // Замыкаем Z-координаты
     
     Log("[ShellHelper] MESH: точки заполнены");
@@ -281,11 +279,7 @@ bool CreateMeshFromPoints(const GS::Array<API_Coord3D>& points)
                 tmpMemo.meshPolyZ = reinterpret_cast<double**>(BMAllocateHandle((element.mesh.poly.nCoords + 1) * sizeof(double), ALLOCATE_CLEAR, 0));
                 if (tmpMemo.meshPolyZ != nullptr) {
                     for (Int32 j = 1; j <= element.mesh.poly.nCoords; j++) {
-                        if (j <= 3) {
-                            (*tmpMemo.meshPolyZ)[j] = (*memo.meshPolyZ)[j];
-                        } else {
-                            (*tmpMemo.meshPolyZ)[j] = 0.0;
-                        }
+                        (*tmpMemo.meshPolyZ)[j] = (*memo.meshPolyZ)[j];
                     }
                     
                     err = ACAPI_Element_Create(&element, &tmpMemo);
