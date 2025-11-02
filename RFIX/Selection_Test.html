@@ -1041,6 +1041,100 @@
       }
     }
 
+    // ================= MESH FROM LINE =================
+    function SelectBaseLineMesh() {
+      const A = window.ACAPI;
+      if (!A) { AddLog('[Mesh] ACAPI unavailable'); return; }
+      if (!A.SetBaseLineForShell) {
+        AddLog('[Mesh] API function SetBaseLineForShell is unavailable');
+        setInfo('info-mesh-line', 'Function unavailable (update the plugin)');
+        return;
+      }
+
+      AddLog('[Mesh] Selecting base line...');
+      setInfo('info-mesh-line', 'Select a base line (spline/polyline/arc/line)...');
+
+      Promise.resolve(A.SetBaseLineForShell()).then(success => {
+        if (success) {
+          setInfo('info-mesh-line', '✅ Base line selected!');
+          AddLog('[Mesh] Base line selected');
+        } else {
+          setInfo('info-mesh-line', '❌ Failed to select line');
+          AddLog('[Mesh] Line selection error');
+        }
+      }).catch(e => {
+        AddLog('[Mesh] Error: ' + e);
+        setInfo('info-mesh-line', '❌ Error: ' + e);
+      });
+    }
+
+    async function SetMeshForMesh() {
+      const A = window.ACAPI;
+      if (!A) { AddLog('[Mesh] ACAPI unavailable'); return; }
+
+      AddLog('[Mesh] Setting mesh for contours...');
+      setInfo("info-mesh-line", "Setting mesh...");
+
+      if (typeof A.SetMeshSurfaceForShell === 'function') {
+        try {
+          const success = await A.SetMeshSurfaceForShell();
+          if (success) {
+            AddLog('[Mesh] ✅ Mesh set successfully');
+            setInfo("info-mesh-line", "✅ Mesh set successfully");
+          } else {
+            AddLog('[Mesh] ❌ Failed to set mesh. Make sure a mesh is selected');
+            setInfo("info-mesh-line", "❌ Failed to set mesh. Make sure a mesh is selected");
+          }
+        } catch (err) {
+          AddLog('[Mesh] ❌ Error calling SetMeshSurfaceForShell: ' + err);
+          setInfo("info-mesh-line", "❌ Error: " + err);
+        }
+      } else {
+        AddLog('[Mesh] ❌ Function SetMeshSurfaceForShell is unavailable');
+        setInfo("info-mesh-line", "❌ Function unavailable (update the plugin)");
+      }
+    }
+
+    async function CreateMeshFromLineUI() {
+      const A = window.ACAPI;
+      if (!A) { AddLog('[Mesh] ACAPI unavailable'); return; }
+
+      AddLog('[Mesh] Creating mesh from line');
+      setInfo("info-mesh-line", "Creating mesh from line...");
+
+      const width = parseNumber(document.getElementById('meshWidth'), 1000);
+      const step  = parseNumber(document.getElementById('meshStep'), 500);
+      
+      if (width <= 0) {
+        setInfo("info-mesh-line", 'Width must be > 0');
+        return;
+      }
+      if (step <= 0) {
+        setInfo("info-mesh-line", 'Step must be > 0');
+        return;
+      }
+
+      if (typeof A.CreateMeshFromContour === 'function') {
+        try {
+          const params = "width:" + width + ",step:" + step;
+          const success = await A.CreateMeshFromContour(params);
+          if (success) {
+            AddLog('[Mesh] ✅ Mesh created successfully');
+            setInfo("info-mesh-line", "✅ Mesh created successfully");
+          } else {
+            AddLog('[Mesh] ❌ Error creating mesh');
+            setInfo("info-mesh-line", "❌ Error creating mesh");
+          }
+        } catch (err) {
+          AddLog('[Mesh] ❌ Error calling CreateMeshFromContour: ' + err);
+          setInfo("info-mesh-line", "❌ Error: " + err);
+        }
+      } else {
+        AddLog('[Mesh] ❌ Function CreateMeshFromContour is unavailable');
+        setInfo("info-mesh-line", "❌ Function unavailable (update the plugin)");
+      }
+    }
+
     // ================= MORPH CREATION =================
     async function CreateMorphUI() {
       const A = window.ACAPI;
@@ -1464,6 +1558,51 @@
         2. Select points on the plan with mouse (pencil cursor will appear)<br>
         3. Mesh will be created from these points<br><br>
         <strong>Note:</strong> This creates a simple Mesh element, not Morph. Z-coordinate is set to 0.0 (on plan level).
+      </div>
+    </fieldset>
+
+    <fieldset class="control-block">
+      <legend>Create Mesh from Line</legend>
+
+      <div style="text-align:center; margin-bottom:10px;">
+        <input type="button" 
+               onclick="SelectBaseLineMesh()" 
+               value="Select Line"
+               style="font-size:14px; padding:6px 15px; font-weight:bold;">
+      </div>
+
+      <div style="text-align:center; margin-bottom:10px;">
+        <input type="button" 
+               onclick="SetMeshForMesh()" 
+               value="Set mesh"
+               style="font-size:14px; padding:6px 15px; font-weight:bold;">
+      </div>
+
+      <div>
+        <label>Width (mm):</label>
+        <input type="number" id="meshWidth" step="1" value="1000">
+      </div>
+
+      <div>
+        <label>Step (mm):</label>
+        <input type="number" id="meshStep" step="1" value="500">
+      </div>
+
+      <div style="text-align:center; margin-top:15px;">
+        <input type="button" 
+               onclick="whenACAPIReadyDo(CreateMeshFromLineUI)" 
+               value="Create Mesh from Line"
+               style="font-size:16px; padding:8px 20px; font-weight:bold;">
+      </div>
+
+      <div id="info-mesh-line" class="info-box">
+        Creates Mesh element from base line with specified parameters.<br>
+        <strong>Workflow:</strong><br>
+        1. Click "Select Line" to select base line (spline/polyline/arc/line)<br>
+        2. Set Width and Step parameters<br>
+        3. (Optional) Click "Set mesh" to select mesh surface for Z-coordinates<br>
+        4. Click "Create Mesh from Line" - creates Mesh from closed contour<br><br>
+        <strong>Note:</strong> If mesh is not set, Mesh will be created at Z=0.0. If mesh is set, Mesh follows the terrain surface.
       </div>
     </fieldset>
 

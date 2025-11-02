@@ -690,8 +690,9 @@ void BrowserRepl::RegisterACAPIJavaScriptObject()
 					return inputErr;
 				}
 				
-				// Фиксируем Z = 0.0 мм (на плане)
-				points.Push(API_Coord3D{gp.pos.x, gp.pos.y, 0.0});
+				// Вторая точка имеет Z = 2000 мм, остальные Z = 0
+				double zHeight = (pointNum == 2) ? 2000.0 : 0.0;
+				points.Push(API_Coord3D{gp.pos.x, gp.pos.y, zHeight});
 				pointNum++;
 			}
 			
@@ -746,8 +747,8 @@ void BrowserRepl::RegisterACAPIJavaScriptObject()
 					return inputErr;
 				}
 				
-				// Фиксируем Z = 0.0 мм (на плане)
-				points.Push(API_Coord3D{gp.pos.x, gp.pos.y, 0.0});
+				// Фиксируем Z = 2000.0 мм (2.0 метра)
+				points.Push(API_Coord3D{gp.pos.x, gp.pos.y, 2000.0});
 				pointNum++;
 			}
 			
@@ -844,6 +845,39 @@ void BrowserRepl::RegisterACAPIJavaScriptObject()
 		}
 		
 		bool success = ShellHelper::CreateMorphFromContour(width, step, thickness, materialTop, materialBottom, materialSide);
+		return new JS::Value(success);
+	}));
+	
+	// --- Create Mesh from Contour ---
+	jsACAPI->AddItem(new JS::Function("CreateMeshFromContour", [](GS::Ref<JS::Base> param) {
+		if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] CreateMeshFromContour() - создание Mesh из контура");
+		
+		// Парсим параметры: принимаем строку "width:..,step:.."
+		double width = 1000.0; // мм по умолчанию
+		double step = 500.0;   // мм по умолчанию
+		
+		if (param != nullptr) {
+			if (GS::Ref<JS::Value> v = GS::DynamicCast<JS::Value>(param)) {
+				if (v->GetType() == JS::Value::STRING) {
+					GS::UniString s = v->GetString();
+					const char* c = s.ToCStr().Get();
+					
+					if (std::strncmp(c, "width:", 6) == 0) { 
+						std::sscanf(c + 6, "%lf", &width); 
+					}
+					const char* stepPtr = std::strstr(c, "step:");
+					if (stepPtr != nullptr) {
+						std::sscanf(stepPtr + 5, "%lf", &step);
+					}
+				}
+			}
+		}
+		
+		if (BrowserRepl::HasInstance()) {
+			BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] CreateMeshFromContour parsed: width=%.1fmm, step=%.1fmm", width, step));
+		}
+		
+		bool success = ShellHelper::CreateMeshFromContour(width, step);
 		return new JS::Value(success);
 	}));
 	

@@ -46,6 +46,7 @@ namespace ShellHelper {
 	bool CreateTestMesh();
 	bool CreateSimpleShell();
 	bool CreateMeshFromPoints(const GS::Array<API_Coord3D>& points);
+	bool CreateMeshFromContour(double widthMM, double stepMM);
 	
 	// Создать контуры и Morph из них
 	// materialTop, materialBottom, materialSide: индексы материалов для граней

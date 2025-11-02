@@ -1579,6 +1579,225 @@ bool CreateMorphFromContour(double widthMM, double stepMM, double thicknessMM,
     }
 }
 
+// =============== Создание Mesh из контура ===============
+bool CreateMeshFromContour(double widthMM, double stepMM)
+{
+    Log("[ShellHelper] CreateMeshFromContour: START, width=%.1fmm, step=%.1fmm", widthMM, stepMM);
+    
+    // Проверяем, что базовая линия выбрана
+    if (g_baseLineGuid == APINULLGuid) {
+        Log("[ShellHelper] ERROR: Базовая линия не выбрана. Сначала выберите базовую линию.");
+        return false;
+    }
+    
+    Log("[ShellHelper] Базовая линия: %s", APIGuidToString(g_baseLineGuid).ToCStr().Get());
+    
+    // Проверяем mesh
+    if (g_meshSurfaceGuid != APINULLGuid) {
+        Log("[ShellHelper] Mesh выбран: %s - будет использоваться для получения Z координат", APIGuidToString(g_meshSurfaceGuid).ToCStr().Get());
+    } else {
+        Log("[ShellHelper] WARNING: Mesh не выбран - будут использоваться Z=0.0 для всех точек");
+    }
+    
+    // Получаем элемент базовой линии по сохраненному GUID
+    API_Elem_Head elemHead = {};
+    elemHead.guid = g_baseLineGuid;
+    GSErrCode err = ACAPI_Element_GetHeader(&elemHead);
+    
+    if (err != NoError) {
+        Log("[ShellHelper] ERROR: Не удалось получить заголовок элемента базовой линии");
+        return false;
+    }
+    
+    // Проверяем поддерживаемые типы элементов
+    bool isSupported = false;
+    if (elemHead.type == API_LineID ||
+        elemHead.type == API_PolyLineID ||
+        elemHead.type == API_ArcID ||
+        elemHead.type == API_CircleID ||
+        elemHead.type == API_SplineID) {
+        isSupported = true;
+    }
+    
+    if (!isSupported) {
+        Log("[ShellHelper] ERROR: Неподдерживаемый тип элемента базовой линии");
+        Log("[ShellHelper] Поддерживаются: Line, Polyline, Arc, Circle, Spline");
+        return false;
+    }
+    
+    // Получаем данные элемента
+    API_Element element = {};
+    element.header = elemHead;
+    err = ACAPI_Element_Get(&element);
+    
+    if (err != NoError) {
+        Log("[ShellHelper] ERROR: Не удалось получить данные элемента базовой линии");
+        return false;
+    }
+    
+    Log("[ShellHelper] Элемент базовой линии загружен успешно");
+    
+    // Парсим элемент в сегменты
+    PathData path;
+    if (!ParseElementToSegments(element, path)) {
+        Log("[ShellHelper] ERROR: Не удалось распарсить элемент в сегменты");
+        return false;
+    }
+    
+    Log("[ShellHelper] Элемент распарсен: %d сегментов, общая длина %.3fм", 
+        (int)path.segs.GetSize(), path.total);
+    
+    // Используем логику из Create3DShellFromPath для получения точек
+    double step = stepMM / 1000.0; // шаг в метрах
+    double halfWidth = widthMM / 2000.0; // половина ширины в метрах
+    
+    // Генерируем позиции точек по шагу
+    GS::Array<double> sVals;
+    for (double s = 0.0; s <= path.total + 1e-9; s += step) {
+        sVals.Push(s);
+    }
+    
+    // Убеждаемся, что последняя точка точно на конце линии
+    if (sVals.IsEmpty() || sVals[sVals.GetSize() - 1] < path.total - 1e-9) {
+        sVals.Push(path.total);
+    }
+    
+    Log("[ShellHelper] Сгенерировано %d точек по шагу %.3fм", (int)sVals.GetSize(), step);
+    
+    GS::Array<API_Coord3D> leftPoints;
+    GS::Array<API_Coord3D> rightPoints;
+    
+    // Обрабатываем каждую точку (та же логика что в Create3DShellFromPath)
+    for (UIndex i = 0; i < sVals.GetSize(); ++i) {
+        double s = sVals[i];
+        API_Coord pointOnPath;
+        double tangentAngle = 0.0;
+        
+        double acc = 0.0;
+        bool found = false;
+        for (UIndex j = 0; j < path.segs.GetSize() && !found; ++j) {
+            const Seg& seg = path.segs[j];
+            
+            if (s > acc + seg.len) {
+                acc += seg.len;
+                continue;
+            }
+            
+            double t = (s - acc) / seg.len;
+            if (seg.type == SegType::Line) {
+                pointOnPath.x = seg.A.x + t * (seg.B.x - seg.A.x);
+                pointOnPath.y = seg.A.y + t * (seg.B.y - seg.A.y);
+                tangentAngle = std::atan2(seg.B.y - seg.A.y, seg.B.x - seg.A.x);
+                found = true;
+            } else if (seg.type == SegType::Arc) {
+                double ang = seg.a0 + t * (seg.a1 - seg.a0);
+                pointOnPath.x = seg.C.x + seg.r * std::cos(ang);
+                pointOnPath.y = seg.C.y + seg.r * std::sin(ang);
+                tangentAngle = ang + ((seg.ccw) ? kPI / 2.0 : -kPI / 2.0);
+                found = true;
+            }
+        }
+        
+        if (!found) {
+            // Если не нашли сегмент, используем последнюю точку
+            const Seg& seg = path.segs[path.segs.GetSize() - 1];
+            if (seg.type == SegType::Line) {
+                pointOnPath = seg.B;
+                tangentAngle = std::atan2(seg.B.y - seg.A.y, seg.B.x - seg.A.x);
+            } else {
+                const double sweep = seg.a1 - seg.a0;
+                pointOnPath.x = seg.C.x + seg.r * std::cos(seg.a1);
+                pointOnPath.y = seg.C.y + seg.r * std::sin(seg.a1);
+                tangentAngle = seg.a1 + ((sweep >= 0.0) ? kPI / 2.0 : -kPI / 2.0);
+            }
+        }
+        
+        // Шаг 1: Получаем Z-координату для точки на базовой линии от Mesh
+        double baseZ = 0.0;
+        API_Vector3D baseNormal = {};
+        if (g_meshSurfaceGuid != APINULLGuid) {
+            // Передаем XY координаты точки на базовой линии в MeshIntersectionHelper
+            API_Coord baseXY = {pointOnPath.x, pointOnPath.y};
+            if (MeshIntersectionHelper::GetZAndNormal(baseXY, baseZ, baseNormal)) {
+                // Логируем первые и последние точки для отладки
+                if (i < 5 || i >= sVals.GetSize() - 5) {
+                    Log("[ShellHelper] Point on base line %d: (%.3f, %.3f) -> Z=%.3f", (int)i + 1, pointOnPath.x, pointOnPath.y, baseZ);
+                }
+            } else {
+                Log("[ShellHelper] WARNING: Failed to get Z for point %d, using Z=0", (int)i + 1);
+            }
+        } else {
+            baseZ = 0.0;
+        }
+        
+        // Шаг 2: Строим перпендикуляр
+        double perpX = std::cos(tangentAngle + kPI / 2.0);
+        double perpY = std::sin(tangentAngle + kPI / 2.0);
+        
+        // Шаг 3: Создаем левую и правую точки
+        API_Coord3D leftPoint = {
+            pointOnPath.x + perpX * halfWidth,
+            pointOnPath.y + perpY * halfWidth,
+            baseZ
+        };
+        API_Coord3D rightPoint = {
+            pointOnPath.x - perpX * halfWidth,
+            pointOnPath.y - perpY * halfWidth,
+            baseZ
+        };
+        
+        leftPoints.Push(leftPoint);
+        rightPoints.Push(rightPoint);
+        
+        // Логируем первые и последние точки для отладки
+        if (i < 5 || i >= sVals.GetSize() - 5) {
+            Log("[ShellHelper] Точка %d: left(%.3f, %.3f, %.3f), right(%.3f, %.3f, %.3f)", 
+                (int)i + 1, leftPoint.x, leftPoint.y, leftPoint.z, rightPoint.x, rightPoint.y, rightPoint.z);
+        }
+    }
+    
+    Log("[ShellHelper] Создано %d пар точек для 3D оболочки", (int)leftPoints.GetSize());
+    
+    // Создаем Mesh из замкнутого контура
+    Log("[ShellHelper] Creating Mesh from closed contour...");
+    GS::Array<API_Coord3D> meshPoints;
+    
+    // Добавляем левые точки от начала до конца (используем Z координаты из mesh, если доступны)
+    for (UIndex i = 0; i < leftPoints.GetSize(); ++i) {
+        double z = leftPoints[i].z;
+        if (g_meshSurfaceGuid == APINULLGuid) {
+            z = 0.0; // Используем Z=0.0 если mesh не выбран (чтобы видно было на плане)
+        }
+        // Если mesh выбран, используем Z полученный от MeshIntersectionHelper
+        meshPoints.Push({leftPoints[i].x, leftPoints[i].y, z});
+    }
+    
+    // Добавляем правые точки от конца до начала (в обратном порядке, используем Z из mesh)
+    for (Int32 i = rightPoints.GetSize() - 1; i >= 0; --i) {
+        double z = rightPoints[i].z;
+        if (g_meshSurfaceGuid == APINULLGuid) {
+            z = 0.0; // Используем Z=0.0 если mesh не выбран (чтобы видно было на плане)
+        }
+        // Если mesh выбран, используем Z полученный от MeshIntersectionHelper
+        meshPoints.Push({rightPoints[i].x, rightPoints[i].y, z});
+    }
+    
+    Log("[ShellHelper] Mesh contour: %d points", (int)meshPoints.GetSize());
+    
+    if (meshPoints.GetSize() >= 3) {
+        if (CreateMeshFromPoints(meshPoints)) {
+            Log("[ShellHelper] SUCCESS: Mesh created from contour!");
+            return true;
+        } else {
+            Log("[ShellHelper] ERROR: Failed to create Mesh from contour");
+            return false;
+        }
+    } else {
+        Log("[ShellHelper] ERROR: Not enough points for Mesh (%d < 3)", (int)meshPoints.GetSize());
+        return false;
+    }
+}
+
 // =============== Создание Spline из 2D точек ===============
 API_Guid CreateSplineFromPoints(const GS::Array<API_Coord>& points)
 {
