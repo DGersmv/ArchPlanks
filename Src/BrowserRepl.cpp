@@ -242,8 +242,11 @@ void BrowserRepl::InitBrowserControl()
 	LogToBrowser("[C++] BrowserRepl initialized");
 	
 #ifndef DEBUG_UI_LOGS
-	// В Release прячем чёрное поле логов
+	// В Release прячем чёрное поле логов (в HTML оно уже скрыто по умолчанию, но на всякий случай)
 	browser.ExecuteJS("var logBox = document.getElementById('log-box'); if (logBox) logBox.style.display = 'none';");
+#else
+	// В Debug показываем поле логов (в HTML оно скрыто по умолчанию)
+	browser.ExecuteJS("var logBox = document.getElementById('log-box'); if (logBox) logBox.style.display = 'block';");
 #endif
 }
 
