@@ -3,7 +3,7 @@ cmake_minimum_required (VERSION 3.16)
 # ================== функции ==================
 function (SetCompilerOptions target)
     target_compile_features (${target} PUBLIC cxx_std_17)
-    target_compile_options (${target} PUBLIC "$<$<CONFIG:Debug>:-DDEBUG>")
+    target_compile_options (${target} PUBLIC "$<$<CONFIG:Debug>:-DDEBUG;-DDEBUG_UI_LOGS>")
     if (WIN32)
         target_compile_options (${target} PUBLIC /W3 /WX /wd4996 /Zc:wchar_t-)
     else ()

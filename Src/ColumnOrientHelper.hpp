@@ -4,21 +4,15 @@
 #include "API_Guid.hpp"
 
 // ============================================================================
-// ColumnOrientHelper — ориентация колонн и балок по поверхности mesh
+// ColumnOrientHelper — ориентация балок по поверхности mesh
 // ============================================================================
 class ColumnOrientHelper {
 public:
-    // Установить колонны для ориентации (из выделения)
-    static bool SetColumns();
-    
     // Установить балки для ориентации (из выделения)
     static bool SetBeams();
     
     // Установить mesh для ориентации (из выделения)
     static bool SetMesh();
-    
-    // Ориентировать колонны по поверхности mesh (не меняя высоту колонн)
-    static bool OrientColumnsToSurface();
     
     // Ориентировать балки по поверхности mesh
     static bool OrientBeamsToSurface();
@@ -29,4 +23,5 @@ public:
 };
 
 #endif // COLUMNORIENTHELPER_HPP
+
 

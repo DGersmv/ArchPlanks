@@ -12,6 +12,7 @@ namespace LayerHelper {
         GS::UniString folderPath;  // Путь к папке (например: "Ландшафт/Растения")
         GS::UniString layerName;   // Название слоя
         GS::UniString baseID;      // Базовое название для ID элементов
+        bool hideLayer = false;    // Скрыть слой после создания
     };
 
     // Создать папку для слоев
@@ -34,6 +35,9 @@ namespace LayerHelper {
 
     // Переместить слой в папку
     bool MoveLayerToFolder(API_AttributeIndex layerIndex, const GS::UniString& folderPath);
+    
+    // Скрыть/показать слой
+    bool SetLayerVisibility(API_AttributeIndex layerIndex, bool hidden);
 
 } // namespace LayerHelper
 

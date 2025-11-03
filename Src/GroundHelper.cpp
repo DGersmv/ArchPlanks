@@ -42,7 +42,9 @@ static inline void Log(const char* fmt, ...)
     GS::UniString s(buf);
     if (BrowserRepl::HasInstance())
         BrowserRepl::GetInstance().LogToBrowser(s);
+#ifdef DEBUG_UI_LOGS
     ACAPI_WriteReport("%s", false, s.ToCStr().Get());
+#endif
 }
 
 // ================================================================

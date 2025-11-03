@@ -12,6 +12,7 @@
 #include "GDLHelper.hpp"
 #include "MarkupHelper.hpp"
 #include "RoadHelper.hpp"
+#include "ShellHelper.hpp"
 #include "HelpPalette.hpp"
 #include "LayerHelper.hpp"
 #include "ColumnOrientHelper.hpp"
@@ -37,12 +38,16 @@ static GS::UniString LoadHtmlFromResource()
 		BMhKill(&data);
 		if (BrowserRepl::HasInstance())
 			BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[UI] HTML resource loaded, size=%u bytes", (unsigned)handleSize));
+#ifdef DEBUG_UI_LOGS
 		ACAPI_WriteReport("[BrowserRepl] HTML resource loaded, size=%u bytes", false, (unsigned)handleSize);
+#endif
 	}
 	else {
 		if (BrowserRepl::HasInstance())
 			BrowserRepl::GetInstance().LogToBrowser("[UI] ERROR: HTML resource not found (DATA 100)");
+#ifdef DEBUG_UI_LOGS
 		ACAPI_WriteReport("[BrowserRepl] ERROR: HTML resource not found (DATA 100)", false);
+#endif
 	}
 	return resourceData;
 }
@@ -72,6 +77,35 @@ static double GetDoubleFromJs(GS::Ref<JS::Base> p, double def = 0.0)
 			for (UIndex i = 0; i < s.GetLength(); ++i) if (s[i] == ',') s[i] = '.';
 			double out = def;
 			std::sscanf(s.ToCStr().Get(), "%lf", &out);
+			return out;
+		}
+	}
+
+	return def;
+}
+
+// --- Extract integer from JS::Base (supports 123 / "123") ---
+static Int32 GetIntFromJs(GS::Ref<JS::Base> p, Int32 def = 0)
+{
+	if (p == nullptr) {
+		return def;
+	}
+
+	if (GS::Ref<JS::Value> v = GS::DynamicCast<JS::Value>(p)) {
+		const auto t = v->GetType();
+
+		if (t == JS::Value::INTEGER) {
+			return v->GetInteger();
+		}
+		
+		if (t == JS::Value::DOUBLE) {
+			return static_cast<Int32>(v->GetDouble());
+		}
+
+		if (t == JS::Value::STRING) {
+			GS::UniString s = v->GetString();
+			Int32 out = def;
+			std::sscanf(s.ToCStr().Get(), "%d", &out);
 			return out;
 		}
 	}
@@ -122,7 +156,9 @@ static double g_lastZDeltaMeters = 0.0;
 static GSErrCode __ACENV_CALL NotificationHandler(API_NotifyEventID notifID, Int32 /*param*/)
 {
 	if (notifID == APINotify_Quit) {
+#ifdef DEBUG_UI_LOGS
 		ACAPI_WriteReport("[BrowserRepl] APINotify_Quit to DestroyInstance", false);
+#endif
 		BrowserRepl::DestroyInstance();
 	}
 	return NoError;
@@ -133,12 +169,16 @@ BrowserRepl::BrowserRepl() :
 	DG::Palette(ACAPI_GetOwnResModule(), BrowserReplResId, ACAPI_GetOwnResModule(), paletteGuid),
 	browser(GetReference(), BrowserId)
 {
+#ifdef DEBUG_UI_LOGS
 	ACAPI_WriteReport("[BrowserRepl] ctor", false);
+#endif
 	ACAPI_ProjectOperation_CatchProjectEvent(APINotify_Quit, NotificationHandler);
 
 	// Подпишемся на изменение выделения (чтобы UI таблица актуализировалась)
 	const GSErr selErr = ACAPI_Notification_CatchSelectionChange(SelectionChangeHandler);
+#ifdef DEBUG_UI_LOGS
 	ACAPI_WriteReport("[BrowserRepl] CatchSelectionChange then err=%d", false, (int)selErr);
+#endif
 
 	Attach(*this);
 	BeginEventProcessing();
@@ -147,7 +187,9 @@ BrowserRepl::BrowserRepl() :
 
 BrowserRepl::~BrowserRepl()
 {
+#ifdef DEBUG_UI_LOGS
 	ACAPI_WriteReport("[BrowserRepl] dtor", false);
+#endif
 	EndEventProcessing();
 }
 
@@ -158,7 +200,9 @@ void BrowserRepl::CreateInstance()
 	DBASSERT(!HasInstance());
 	instance = new BrowserRepl();
 	ACAPI_KeepInMemory(true);
+#ifdef DEBUG_UI_LOGS
 	ACAPI_WriteReport("[BrowserRepl] CreateInstance", false);
+#endif
 }
 
 BrowserRepl& BrowserRepl::GetInstance()
@@ -171,29 +215,44 @@ void BrowserRepl::DestroyInstance() { instance = nullptr; }
 
 void BrowserRepl::Show()
 {
+#ifdef DEBUG_UI_LOGS
 	ACAPI_WriteReport("[BrowserRepl] Show", false);
+#endif
 	DG::Palette::Show();
 	SetMenuItemCheckedState(true);
 }
 
 void BrowserRepl::Hide()
 {
+#ifdef DEBUG_UI_LOGS
 	ACAPI_WriteReport("[BrowserRepl] Hide", false);
+#endif
 	DG::Palette::Hide();
 	SetMenuItemCheckedState(false);
 }
 
 void BrowserRepl::InitBrowserControl()
 {
+#ifdef DEBUG_UI_LOGS
 	ACAPI_WriteReport("[BrowserRepl] InitBrowserControl: loading HTML", false);
+#endif
 	browser.LoadHTML(LoadHtmlFromResource());
 	RegisterACAPIJavaScriptObject();
 	// Страница сама дернёт UpdateSelectedElements() через whenACAPIReadyDo
 	LogToBrowser("[C++] BrowserRepl initialized");
+	
+#ifndef DEBUG_UI_LOGS
+	// В Release прячем чёрное поле логов (в HTML оно уже скрыто по умолчанию, но на всякий случай)
+	browser.ExecuteJS("var logBox = document.getElementById('log-box'); if (logBox) logBox.style.display = 'none';");
+#else
+	// В Debug показываем поле логов (в HTML оно скрыто по умолчанию)
+	browser.ExecuteJS("var logBox = document.getElementById('log-box'); if (logBox) logBox.style.display = 'block';");
+#endif
 }
 
 void BrowserRepl::LogToBrowser(const GS::UniString& msg)
 {
+#ifdef DEBUG_UI_LOGS
 	// UniString → UTF-8
 	std::string utf8(msg.ToCStr(CC_UTF8));
 	GS::UniString jsSafe(utf8.c_str(), CC_UTF8);
@@ -205,12 +264,15 @@ void BrowserRepl::LogToBrowser(const GS::UniString& msg)
 	jsSafe.ReplaceAll("\n", "\\n");
 
 	browser.ExecuteJS("AddLog(\"" + jsSafe + "\");");
+#endif
 }
 
 // ------------------ JS API registration ---------------------
 void BrowserRepl::RegisterACAPIJavaScriptObject()
 {
+#ifdef DEBUG_UI_LOGS
 	ACAPI_WriteReport("[BrowserRepl] RegisterACAPIJavaScriptObject", false);
+#endif
 
 	JS::Object* jsACAPI = new JS::Object("ACAPI");
 
@@ -271,13 +333,20 @@ void BrowserRepl::RegisterACAPIJavaScriptObject()
 			params.folderPath = parts[0];
 			params.layerName = parts[1];
 			params.baseID = GS::UniString(""); // ID не меняем
+			params.hideLayer = false; // По умолчанию не скрываем
+			
+			// Если есть третий параметр, это флаг скрытия
+			if (parts.GetSize() >= 3) {
+				params.hideLayer = (parts[2] == "1" || parts[2] == "true" || parts[2] == "True");
+			}
 		}
 		
 		if (BrowserRepl::HasInstance()) {
-			BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[C++] Создание слоя: папка='%s', слой='%s', ID='%s'", 
+			BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[C++] Создание слоя: папка='%s', слой='%s', ID='%s', hide=%s", 
 				params.folderPath.ToCStr().Get(), 
 				params.layerName.ToCStr().Get(), 
-				params.baseID.ToCStr().Get()));
+				params.baseID.ToCStr().Get(),
+				params.hideLayer ? "true" : "false"));
 		}
 		
 		const bool success = LayerHelper::CreateLayerAndMoveElements(params);
@@ -414,11 +483,7 @@ void BrowserRepl::RegisterACAPIJavaScriptObject()
 		return new JS::Value(LandscapeHelper::DistributeSelected(step, count));
 		}));
 
-	// --- Column/Beam Orientation API ---
-	jsACAPI->AddItem(new JS::Function("SetColumns", [](GS::Ref<JS::Base>) {
-		if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] SetColumns()");
-		return new JS::Value(ColumnOrientHelper::SetColumns());
-		}));
+	// --- Beam Orientation API ---
 	jsACAPI->AddItem(new JS::Function("SetBeams", [](GS::Ref<JS::Base>) {
 		if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] SetBeams()");
 		return new JS::Value(ColumnOrientHelper::SetBeams());
@@ -426,10 +491,6 @@ void BrowserRepl::RegisterACAPIJavaScriptObject()
 	jsACAPI->AddItem(new JS::Function("SetMeshForColumns", [](GS::Ref<JS::Base>) {
 		if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] SetMeshForColumns()");
 		return new JS::Value(ColumnOrientHelper::SetMesh());
-		}));
-	jsACAPI->AddItem(new JS::Function("OrientColumnsToSurface", [](GS::Ref<JS::Base>) {
-		if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] OrientColumnsToSurface()");
-		return new JS::Value(ColumnOrientHelper::OrientColumnsToSurface());
 		}));
 	jsACAPI->AddItem(new JS::Function("OrientBeamsToSurface", [](GS::Ref<JS::Base>) {
 		if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] OrientBeamsToSurface()");
@@ -476,7 +537,9 @@ void BrowserRepl::RegisterACAPIJavaScriptObject()
 			if (v->GetType() == JS::Value::STRING) url = v->GetString();
 		}
 		if (url.IsEmpty()) url = "https://landscape.227.info/help/start";
+#ifdef DEBUG_UI_LOGS
 		ACAPI_WriteReport("[OpenHelp] url=%s", false, url.ToCStr().Get());
+#endif
 		if (BrowserRepl::HasInstance())
 			BrowserRepl::GetInstance().LogToBrowser("[C++] OpenHelp to " + url);
 		HelpPalette::ShowWithURL(url);
@@ -540,18 +603,87 @@ void BrowserRepl::RegisterACAPIJavaScriptObject()
 
 	// --- Road API (выбор осевой линии) ---
 	jsACAPI->AddItem(new JS::Function("SetBaseLineForShell", [](GS::Ref<JS::Base>) {
-		if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] SetBaseLineForShell() [Road]");
+		if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] SetBaseLineForShell() [Shell]");
 		
-		const bool success = RoadHelper::SetCenterLine();
+		// Используем ShellHelper для установки базовой линии (работает для контуров)
+		const bool success = ShellHelper::SetBaseLineForShell();
+		
+		// Также синхронизируем с RoadHelper для совместимости
+		if (success) {
+			RoadHelper::SetCenterLine(); // Это также обновит RoadHelper, если нужно
+		}
+		
 		return new JS::Value(success);
 		}));
 
 	jsACAPI->AddItem(new JS::Function("SetMeshSurfaceForShell", [](GS::Ref<JS::Base>) {
-		if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] SetMeshSurfaceForShell() [Road]");
+		if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] SetMeshSurfaceForShell() [Shell]");
 		
-		const bool success = RoadHelper::SetTerrainMesh();
+		// Вызываем ShellHelper::SetMeshSurfaceForShell(), который установит mesh в ShellHelper и GroundHelper
+		const bool success = ShellHelper::SetMeshSurfaceForShell();
+		
+		// Также синхронизируем с RoadHelper для совместимости
+		if (success) {
+			RoadHelper::SetTerrainMesh(); // Это также обновит RoadHelper, если нужно
+		}
+		
 		return new JS::Value(success);
 		}));
+
+	// --- Create Mesh from Contour ---
+	jsACAPI->AddItem(new JS::Function("CreateMeshFromContour", [](GS::Ref<JS::Base> param) {
+		if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] CreateMeshFromContour() - создание Mesh из контура");
+		
+		// Парсим параметры: принимаем строку "width:..,step:.."
+		double width = 1000.0; // мм по умолчанию
+		double step = 500.0;   // мм по умолчанию
+		
+		if (param != nullptr) {
+			if (GS::Ref<JS::Value> v = GS::DynamicCast<JS::Value>(param)) {
+				if (v->GetType() == JS::Value::STRING) {
+					GS::UniString s = v->GetString();
+					const char* c = s.ToCStr().Get();
+					
+					if (std::strncmp(c, "width:", 6) == 0) { 
+						std::sscanf(c + 6, "%lf", &width); 
+					}
+					const char* stepPtr = std::strstr(c, "step:");
+					if (stepPtr != nullptr) {
+						std::sscanf(stepPtr + 5, "%lf", &step);
+					}
+				}
+			}
+		}
+		
+		if (BrowserRepl::HasInstance()) {
+			BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] CreateMeshFromContour parsed: width=%.1fmm, step=%.1fmm", width, step));
+		}
+		
+		bool success = ShellHelper::CreateMeshFromContour(width, step);
+		return new JS::Value(success);
+	}));
+	
+	// --- Get Surface Finishes List (покрытия) ---
+	jsACAPI->AddItem(new JS::Function("GetSurfaceFinishesList", [](GS::Ref<JS::Base> param) {
+		if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] GetSurfaceFinishesList()");
+		
+		GS::Array<RoadHelper::SurfaceFinishInfo> finishes = RoadHelper::GetSurfaceFinishesList();
+		
+		JS::Object* result = new JS::Object();
+		JS::Array* finishArray = new JS::Array();
+		
+		for (UIndex i = 0; i < finishes.GetSize(); ++i) {
+			JS::Object* finishObj = new JS::Object();
+			finishObj->AddItem("index", new JS::Value((double)finishes[i].index));
+			finishObj->AddItem("name", new JS::Value(finishes[i].name));
+			finishArray->AddItem(finishObj);
+		}
+		
+		result->AddItem("finishes", finishArray);
+		result->AddItem("count", new JS::Value((double)finishes.GetSize()));
+		
+		return result;
+	}));
 
 	// --- Road API (создание дорожки по линии) ---
 	jsACAPI->AddItem(new JS::Function("CreateShellFromLine", [](GS::Ref<JS::Base> param) {
@@ -590,12 +722,16 @@ void BrowserRepl::RegisterACAPIJavaScriptObject()
 			BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] CreateShellFromLine parsed: width=%.1fmm, step=%.1fmm", width, step));
 		}
 		
+#ifdef DEBUG_UI_LOGS
 		ACAPI_WriteReport("[BrowserRepl] Вызов RoadHelper::BuildRoad", false);
+#endif
 		RoadHelper::RoadParams params;
 		params.widthMM = width;
 		params.sampleStepMM = step;
 		const bool success = RoadHelper::BuildRoad(params);
+#ifdef DEBUG_UI_LOGS
 		ACAPI_WriteReport("[BrowserRepl] RoadHelper::BuildRoad вернул: %s", false, success ? "true" : "false");
+#endif
 		return new JS::Value(success);
 		}));
 
@@ -607,7 +743,9 @@ void BrowserRepl::RegisterACAPIJavaScriptObject()
 // ------------------- Palette and Events ----------------------
 void BrowserRepl::UpdateSelectedElementsOnHTML()
 {
+#ifdef DEBUG_UI_LOGS
 	ACAPI_WriteReport("[BrowserRepl] UpdateSelectedElementsOnHTML()", false);
+#endif
 	browser.ExecuteJS("UpdateSelectedElements()");
 }
 
@@ -627,7 +765,9 @@ void BrowserRepl::SetMenuItemCheckedState(bool isChecked)
 
 void BrowserRepl::PanelResized(const DG::PanelResizeEvent& ev)
 {
+#ifdef DEBUG_UI_LOGS
 	ACAPI_WriteReport("[BrowserRepl] PanelResized dx=%d dy=%d", false, (int)ev.GetHorizontalChange(), (int)ev.GetVerticalChange());
+#endif
 	BeginMoveResizeItems();
 	browser.Resize(ev.GetHorizontalChange(), ev.GetVerticalChange());
 	EndMoveResizeItems();
@@ -635,14 +775,18 @@ void BrowserRepl::PanelResized(const DG::PanelResizeEvent& ev)
 
 void BrowserRepl::PanelCloseRequested(const DG::PanelCloseRequestEvent&, bool* accepted)
 {
+#ifdef DEBUG_UI_LOGS
 	ACAPI_WriteReport("[BrowserRepl] PanelCloseRequested will Hide", false);
+#endif
 	Hide();
 	*accepted = true;
 }
 
 GSErrCode __ACENV_CALL BrowserRepl::SelectionChangeHandler(const API_Neig*)
 {
+#ifdef DEBUG_UI_LOGS
 	ACAPI_WriteReport("[BrowserRepl] Selection changed then update UI", false);
+#endif
 	if (BrowserRepl::HasInstance())
 		BrowserRepl::GetInstance().UpdateSelectedElementsOnHTML();
 	return NoError;
@@ -650,46 +794,61 @@ GSErrCode __ACENV_CALL BrowserRepl::SelectionChangeHandler(const API_Neig*)
 
 GSErrCode __ACENV_CALL BrowserRepl::PaletteControlCallBack(Int32, API_PaletteMessageID messageID, GS::IntPtr param)
 {
+#ifdef DEBUG_UI_LOGS
 	switch (messageID) {
 	case APIPalMsg_OpenPalette:
 		ACAPI_WriteReport("[BrowserRepl] PalMsg: OpenPalette", false);
-		if (!HasInstance()) CreateInstance();
-		GetInstance().Show();
 		break;
-
 	case APIPalMsg_ClosePalette:
 		ACAPI_WriteReport("[BrowserRepl] PalMsg: ClosePalette", false);
-		if (!HasInstance()) break;
-		GetInstance().Hide();
 		break;
-
 	case APIPalMsg_HidePalette_Begin:
 		ACAPI_WriteReport("[BrowserRepl] PalMsg: HidePalette_Begin", false);
-		if (HasInstance() && GetInstance().IsVisible()) GetInstance().Hide();
 		break;
-
 	case APIPalMsg_HidePalette_End:
 		ACAPI_WriteReport("[BrowserRepl] PalMsg: HidePalette_End", false);
-		if (HasInstance() && !GetInstance().IsVisible()) GetInstance().Show();
 		break;
-
 	case APIPalMsg_DisableItems_Begin:
 		ACAPI_WriteReport("[BrowserRepl] PalMsg: DisableItems_Begin", false);
-		if (HasInstance() && GetInstance().IsVisible()) GetInstance().DisableItems();
 		break;
-
 	case APIPalMsg_DisableItems_End:
 		ACAPI_WriteReport("[BrowserRepl] PalMsg: DisableItems_End", false);
-		if (HasInstance() && GetInstance().IsVisible()) GetInstance().EnableItems();
 		break;
-
 	case APIPalMsg_IsPaletteVisible:
 		*(reinterpret_cast<bool*> (param)) = HasInstance() && GetInstance().IsVisible();
 		ACAPI_WriteReport("[BrowserRepl] PalMsg: IsPaletteVisible this %d", false, (int)*(reinterpret_cast<bool*> (param)));
 		break;
-
 	default:
 		ACAPI_WriteReport("[BrowserRepl] PalMsg: %d", false, (int)messageID);
+		break;
+	}
+#endif
+
+	switch (messageID) {
+	case APIPalMsg_OpenPalette:
+		if (!HasInstance()) CreateInstance();
+		GetInstance().Show();
+		break;
+	case APIPalMsg_ClosePalette:
+		if (!HasInstance()) break;
+		GetInstance().Hide();
+		break;
+	case APIPalMsg_HidePalette_Begin:
+		if (HasInstance() && GetInstance().IsVisible()) GetInstance().Hide();
+		break;
+	case APIPalMsg_HidePalette_End:
+		if (HasInstance() && !GetInstance().IsVisible()) GetInstance().Show();
+		break;
+	case APIPalMsg_DisableItems_Begin:
+		if (HasInstance() && GetInstance().IsVisible()) GetInstance().DisableItems();
+		break;
+	case APIPalMsg_DisableItems_End:
+		if (HasInstance() && GetInstance().IsVisible()) GetInstance().EnableItems();
+		break;
+	case APIPalMsg_IsPaletteVisible:
+		*(reinterpret_cast<bool*> (param)) = HasInstance() && GetInstance().IsVisible();
+		break;
+	default:
 		break;
 	}
 	return NoError;
@@ -697,7 +856,9 @@ GSErrCode __ACENV_CALL BrowserRepl::PaletteControlCallBack(Int32, API_PaletteMes
 
 GSErrCode BrowserRepl::RegisterPaletteControlCallBack()
 {
+#ifdef DEBUG_UI_LOGS
 	ACAPI_WriteReport("[BrowserRepl] RegisterPaletteControlCallBack()", false);
+#endif
 	return ACAPI_RegisterModelessWindow(
 		GS::CalculateHashValue(paletteGuid),
 		PaletteControlCallBack,

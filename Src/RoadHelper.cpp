@@ -46,7 +46,9 @@ namespace RoadHelper {
             BrowserRepl::GetInstance().LogToBrowser(s);
         }
 
+#ifdef DEBUG_UI_LOGS
         ACAPI_WriteReport("%s", false, s.ToCStr().Get());
+#endif
     }
 
     // ----------------------------------------------------------------------------
@@ -853,6 +855,632 @@ namespace RoadHelper {
 
         Log("[RoadHelper] ✅ ГОТОВО: создали контур дороги");
         return true;
+    }
+
+    // ============================================================================
+    // Перенесено из MeshHelper: функции создания Morph (НЕ создают mesh!)
+    // ============================================================================
+    
+    // Внутренняя реализация создания Morph из точек (без Undo-обертки)
+    // thicknessMM: толщина в мм (0 = плоский, только верхняя поверхность)
+    // materialTop, materialBottom, materialSide: индексы материалов для граней
+    static bool CreateMorphFromPointsInternal(const GS::Array<API_Coord3D>& points, double thicknessMM,
+                                              API_AttributeIndex materialTop, API_AttributeIndex materialBottom, API_AttributeIndex materialSide)
+    {
+        const UIndex numPoints = points.GetSize();
+        const double thickness = thicknessMM / 1000.0; // convert to meters
+        Log("[RoadHelper] CreateMorphFromPoints: START with %d points, thickness=%.3f m", (int)numPoints, thickness);
+        
+        if (numPoints < 3) {
+            Log("[RoadHelper] ERROR: Need at least 3 points to create Morph");
+            return false;
+        }
+        
+        // Use first point as reference (including Z coordinate)
+        const double refX = points[0].x;
+        const double refY = points[0].y;
+        const double refZ = points[0].z;
+        
+        // Create Morph element
+        API_Element element = {};
+        element.header.type = API_MorphID;
+        
+        GSErrCode err = ACAPI_Element_GetDefaults(&element, nullptr);
+        if (err != NoError) {
+            Log("[RoadHelper] ERROR: ACAPI_Element_GetDefaults failed, err=%d", (int)err);
+            return false;
+        }
+        
+        Log("[RoadHelper] Morph defaults obtained, floorInd=%d", (int)element.header.floorInd);
+        
+        // Use all points to create Morph with real Z coordinates from mesh
+        Log("[RoadHelper] Creating Morph from %d points with varying Z coordinates (refZ=%.3f m)", (int)numPoints, refZ);
+        
+        // Setup transformation matrix
+        double* tmx = element.morph.tranmat.tmx;
+        tmx[ 0] = 1.0;  tmx[ 4] = 0.0;  tmx[ 8] = 0.0;
+        tmx[ 1] = 0.0;  tmx[ 5] = 1.0;  tmx[ 9] = 0.0;
+        tmx[ 2] = 0.0;  tmx[ 6] = 0.0;  tmx[10] = 1.0;
+        // Use first point as reference for positioning (including Z)
+        tmx[ 3] = refX;  tmx[ 7] = refY;  tmx[11] = refZ;
+        
+        // Create body structure via ACAPI_Body_Create
+        void* bodyData = nullptr;
+        GSErrCode bodyErr = ACAPI_Body_Create(nullptr, nullptr, &bodyData);
+        if (bodyErr != NoError || bodyData == nullptr) {
+            Log("[RoadHelper] ERROR: ACAPI_Body_Create failed, err=%d", (int)bodyErr);
+            return false;
+        }
+        
+        Log("[RoadHelper] Body created, adding vertices...");
+        
+        // Determine number of vertices based on thickness
+        const bool hasThickness = (thickness > 1e-9);
+        const UIndex totalVertices = hasThickness ? (numPoints * 2) : numPoints;
+        
+        // Add vertices (relative to reference point, including Z)
+        GS::Array<UInt32> vertexIndices;
+        vertexIndices.SetSize(totalVertices);
+        
+        // Add top vertices (always)
+        for (UIndex i = 0; i < numPoints; ++i) {
+            // Coordinates relative to first point (including Z)
+            API_Coord3D coord = {
+                points[i].x - refX,
+                points[i].y - refY,
+                points[i].z - refZ  // Z relative to reference Z from mesh
+            };
+            
+            UInt32 vertexIndex;
+            GSErrCode vertErr = ACAPI_Body_AddVertex(bodyData, coord, vertexIndex);
+            if (vertErr != NoError) {
+                Log("[RoadHelper] ERROR: ACAPI_Body_AddVertex failed for top vertex %d, err=%d", (int)i, (int)vertErr);
+                ACAPI_Body_Dispose(&bodyData);
+                return false;
+            }
+            vertexIndices[i] = vertexIndex;
+            // Не логируем каждый vertex для производительности - только ошибки
+        }
+        
+        // Add bottom vertices if thickness > 0
+        if (hasThickness) {
+            for (UIndex i = 0; i < numPoints; ++i) {
+                // Bottom vertices: same XY, but Z shifted down by thickness
+                API_Coord3D coord = {
+                    points[i].x - refX,
+                    points[i].y - refY,
+                    points[i].z - refZ - thickness  // Z shifted down
+                };
+                
+                UInt32 vertexIndex;
+                GSErrCode vertErr = ACAPI_Body_AddVertex(bodyData, coord, vertexIndex);
+                if (vertErr != NoError) {
+                    Log("[RoadHelper] ERROR: ACAPI_Body_AddVertex failed for bottom vertex %d, err=%d", (int)i, (int)vertErr);
+                    ACAPI_Body_Dispose(&bodyData);
+                    return false;
+                }
+                vertexIndices[numPoints + i] = vertexIndex;
+                // Не логируем каждый vertex для производительности - только ошибки
+            }
+            Log("[RoadHelper] Added %d top vertices and %d bottom vertices (total: %d)", 
+                (int)numPoints, (int)numPoints, (int)totalVertices);
+        } else {
+            Log("[RoadHelper] Added %d top vertices (flat surface)", (int)numPoints);
+        }
+        
+        Log("[RoadHelper] Vertices added, creating edges and triangulating...");
+        
+        // The points are arranged as: left contour (0..n/2-1), then right contour in reverse (n/2..n-1)
+        // Triangulation scheme: for each segment i:
+        //   Triangle 1: L_i, R_i, L_{i+1}
+        //   Triangle 2: L_{i+1}, R_i, R_{i+1}
+        const UIndex numLeftPoints = numPoints / 2;
+        const UIndex numSegments = numLeftPoints - 1; // segments between left points
+        const UIndex numTriangles = numSegments * 2; // 2 triangles per segment
+        
+        Log("[RoadHelper] Triangulating %d points (%d left + %d right) into %d triangles (2 per segment)", 
+            (int)numPoints, (int)numLeftPoints, (int)numLeftPoints, (int)numTriangles);
+        
+        // Add polygon normal - we'll compute it per triangle
+        Int32 polyNormalIndex;
+        API_Vector3D normal = {0.0, 0.0, 1.0}; // default normal
+        GSErrCode normErr = ACAPI_Body_AddPolyNormal(bodyData, normal, polyNormalIndex);
+        if (normErr != NoError) {
+            Log("[RoadHelper] ERROR: ACAPI_Body_AddPolyNormal failed, err=%d", (int)normErr);
+            ACAPI_Body_Dispose(&bodyData);
+            return false;
+        }
+        
+        // Materials for different faces (passed as parameters)
+        API_OverriddenAttribute materialTopAttr;
+        materialTopAttr = materialTop;
+        
+        API_OverriddenAttribute materialBottomAttr;
+        materialBottomAttr = materialBottom;
+        
+        API_OverriddenAttribute materialSideAttr;
+        materialSideAttr = materialSide;
+        
+        // Helper function to create a triangle (defined before use for both top and bottom surfaces)
+        // materialParam: material to use for this triangle
+        auto CreateTriangle = [&](UIndex v0, UIndex v1, UIndex v2, const API_Coord3D& p0_abs, const API_Coord3D& p1_abs, const API_Coord3D& p2_abs, int triNum, const API_OverriddenAttribute& materialParam) -> bool {
+                // Create edges for this triangle
+                Int32 edge01, edge12, edge20;
+                GSErrCode edgeErr;
+                
+                edgeErr = ACAPI_Body_AddEdge(bodyData, v0, v1, edge01);
+                if (edgeErr != NoError) {
+                    Log("[RoadHelper] ERROR: ACAPI_Body_AddEdge failed for triangle %d, edge %d-%d, err=%d", 
+                        triNum, (int)v0, (int)v1, (int)edgeErr);
+                    return false;
+                }
+                
+                edgeErr = ACAPI_Body_AddEdge(bodyData, v1, v2, edge12);
+                if (edgeErr != NoError) {
+                    Log("[RoadHelper] ERROR: ACAPI_Body_AddEdge failed for triangle %d, edge %d-%d, err=%d", 
+                        triNum, (int)v1, (int)v2, (int)edgeErr);
+                    return false;
+                }
+                
+                edgeErr = ACAPI_Body_AddEdge(bodyData, v2, v0, edge20);
+                if (edgeErr != NoError) {
+                    Log("[RoadHelper] ERROR: ACAPI_Body_AddEdge failed for triangle %d, edge %d-%d, err=%d", 
+                        triNum, (int)v2, (int)v0, (int)edgeErr);
+                    return false;
+                }
+                
+                // Compute normal for this triangle (from absolute coordinates)
+                API_Coord3D p0 = {p0_abs.x - refX, p0_abs.y - refY, p0_abs.z - refZ};
+                API_Coord3D p1 = {p1_abs.x - refX, p1_abs.y - refY, p1_abs.z - refZ};
+                API_Coord3D p2 = {p2_abs.x - refX, p2_abs.y - refY, p2_abs.z - refZ};
+                
+                // Compute cross product for normal
+                double v1x = p1.x - p0.x, v1y = p1.y - p0.y, v1z = p1.z - p0.z;
+                double v2x = p2.x - p0.x, v2y = p2.y - p0.y, v2z = p2.z - p0.z;
+                
+                API_Vector3D triNormal;
+                triNormal.x = v1y * v2z - v1z * v2y;
+                triNormal.y = v1z * v2x - v1x * v2z;
+                triNormal.z = v1x * v2y - v1y * v2x;
+                
+                // Normalize
+                double len = std::sqrt(triNormal.x * triNormal.x + triNormal.y * triNormal.y + triNormal.z * triNormal.z);
+                if (len > 1e-9) {
+                    triNormal.x /= len;
+                    triNormal.y /= len;
+                    triNormal.z /= len;
+                } else {
+                    triNormal = normal; // fallback to default
+                }
+                
+                // Add normal for this triangle
+                Int32 triNormalIndex;
+                GSErrCode normErr2 = ACAPI_Body_AddPolyNormal(bodyData, triNormal, triNormalIndex);
+                if (normErr2 != NoError) {
+                    triNormalIndex = polyNormalIndex; // fallback
+                }
+                
+                // Create polygon (triangle) from edges
+                GS::Array<Int32> triEdges;
+                triEdges.Push(edge01);
+                triEdges.Push(edge12);
+                triEdges.Push(edge20);
+                
+                // Material will be passed as parameter (top, bottom, or side)
+                // Default to top material for now, will be overridden in calls
+                UInt32 triPolyIndex;
+                GSErrCode polyErr = ACAPI_Body_AddPolygon(
+                    bodyData,
+                    triEdges,
+                    triNormalIndex,
+                    materialParam, // Use passed material
+                    triPolyIndex
+                );
+                
+                if (polyErr != NoError) {
+                    Log("[RoadHelper] ERROR: ACAPI_Body_AddPolygon failed for triangle %d, err=%d", 
+                        triNum, (int)polyErr);
+                    return false;
+                }
+                
+                return true;
+        };
+        
+        // Create triangles between left and right contours (top surface)
+        for (UIndex i = 0; i < numSegments; ++i) {
+            // Indices:
+            // L_i = i (left point i)
+            // L_{i+1} = i+1 (left point i+1)
+            // R_i = numLeftPoints + (numLeftPoints - 1 - i) = 2*numLeftPoints - 1 - i (right point i, in reverse order)
+            // R_{i+1} = 2*numLeftPoints - 1 - (i+1) = 2*numLeftPoints - 2 - i (right point i+1, in reverse order)
+            
+            UIndex left_i = i;
+            UIndex left_i1 = i + 1;
+            UIndex right_i = 2 * numLeftPoints - 1 - i;
+            UIndex right_i1 = 2 * numLeftPoints - 2 - i;
+            
+            // Triangle 1: L_i, R_i, L_{i+1}
+            UIndex v0_tri1 = vertexIndices[left_i];
+            UIndex v1_tri1 = vertexIndices[right_i];
+            UIndex v2_tri1 = vertexIndices[left_i1];
+            
+            // Triangle 2: L_{i+1}, R_i, R_{i+1}
+            UIndex v0_tri2 = vertexIndices[left_i1];
+            UIndex v1_tri2 = vertexIndices[right_i];
+            UIndex v2_tri2 = vertexIndices[right_i1];
+            
+            // Create Triangle 1: L_i, R_i, L_{i+1} (top surface)
+            if (!CreateTriangle(v0_tri1, v1_tri1, v2_tri1, 
+                                points[left_i], points[right_i], points[left_i1],
+                                (int)(i * 2), materialTopAttr)) {
+                ACAPI_Body_Dispose(&bodyData);
+                return false;
+            }
+            
+            // Create Triangle 2: L_{i+1}, R_i, R_{i+1} (top surface)
+            if (!CreateTriangle(v0_tri2, v1_tri2, v2_tri2,
+                                points[left_i1], points[right_i], points[right_i1],
+                                (int)(i * 2 + 1), materialTopAttr)) {
+                ACAPI_Body_Dispose(&bodyData);
+                return false;
+            }
+        }
+        
+        Log("[RoadHelper] Top surface: %d triangles added", (int)numTriangles);
+        
+        // Create bottom surface if thickness > 0
+        if (hasThickness) {
+            Log("[RoadHelper] Creating bottom surface...");
+            
+            // Bottom surface: same triangles but with bottom vertices and reversed order for correct normals
+            for (UIndex i = 0; i < numSegments; ++i) {
+                UIndex left_i = i;
+                UIndex left_i1 = i + 1;
+                UIndex right_i = 2 * numLeftPoints - 1 - i;
+                UIndex right_i1 = 2 * numLeftPoints - 2 - i;
+                
+                // Bottom vertices indices (offset by numPoints)
+                UIndex bottom_left_i = numPoints + left_i;
+                UIndex bottom_left_i1 = numPoints + left_i1;
+                UIndex bottom_right_i = numPoints + right_i;
+                UIndex bottom_right_i1 = numPoints + right_i1;
+                
+                // Bottom Triangle 1: L_{i+1}, R_i, L_i (reversed order for downward normal)
+                API_Coord3D p0_bot = {points[left_i1].x - refX, points[left_i1].y - refY, points[left_i1].z - refZ - thickness};
+                API_Coord3D p1_bot = {points[right_i].x - refX, points[right_i].y - refY, points[right_i].z - refZ - thickness};
+                API_Coord3D p2_bot = {points[left_i].x - refX, points[left_i].y - refY, points[left_i].z - refZ - thickness};
+                
+                if (!CreateTriangle(vertexIndices[bottom_left_i1], vertexIndices[bottom_right_i], vertexIndices[bottom_left_i],
+                                    p0_bot, p1_bot, p2_bot, (int)(numTriangles + i * 2), materialBottomAttr)) {
+                    ACAPI_Body_Dispose(&bodyData);
+                    return false;
+                }
+                
+                // Bottom Triangle 2: R_{i+1}, R_i, L_{i+1} (reversed order)
+                API_Coord3D p3_bot = {points[right_i1].x - refX, points[right_i1].y - refY, points[right_i1].z - refZ - thickness};
+                
+                if (!CreateTriangle(vertexIndices[bottom_right_i1], vertexIndices[bottom_right_i], vertexIndices[bottom_left_i1],
+                                    p3_bot, p1_bot, p0_bot, (int)(numTriangles + i * 2 + 1), materialBottomAttr)) {
+                    ACAPI_Body_Dispose(&bodyData);
+                    return false;
+                }
+            }
+            Log("[RoadHelper] Bottom surface: %d triangles added", (int)numTriangles);
+            
+            // Create side faces (left, right, front, back)
+            Log("[RoadHelper] Creating side faces...");
+            const UIndex numSideTriangles = numSegments * 4 + 4; // 2 per segment on each side + 2 for front + 2 for back
+            
+            // Left side faces (connecting left contour top to bottom)
+            for (UIndex i = 0; i < numSegments; ++i) {
+                UIndex left_i = i;
+                UIndex left_i1 = i + 1;
+                UIndex bottom_left_i = numPoints + left_i;
+                UIndex bottom_left_i1 = numPoints + left_i1;
+                
+                // Side triangle 1: L_i_top, L_i_bottom, L_{i+1}_bottom
+                API_Coord3D p_top = {points[left_i].x - refX, points[left_i].y - refY, points[left_i].z - refZ};
+                API_Coord3D p_bot = {points[left_i].x - refX, points[left_i].y - refY, points[left_i].z - refZ - thickness};
+                API_Coord3D p_bot_next = {points[left_i1].x - refX, points[left_i1].y - refY, points[left_i1].z - refZ - thickness};
+                
+                if (!CreateTriangle(vertexIndices[left_i], vertexIndices[bottom_left_i], vertexIndices[bottom_left_i1],
+                                    p_top, p_bot, p_bot_next, (int)(numTriangles * 2 + i * 2), materialSideAttr)) {
+                    ACAPI_Body_Dispose(&bodyData);
+                    return false;
+                }
+                
+                // Side triangle 2: L_i_top, L_{i+1}_bottom, L_{i+1}_top
+                API_Coord3D p_top_next = {points[left_i1].x - refX, points[left_i1].y - refY, points[left_i1].z - refZ};
+                
+                if (!CreateTriangle(vertexIndices[left_i], vertexIndices[bottom_left_i1], vertexIndices[left_i1],
+                                    p_top, p_bot_next, p_top_next, (int)(numTriangles * 2 + i * 2 + 1), materialSideAttr)) {
+                    ACAPI_Body_Dispose(&bodyData);
+                    return false;
+                }
+            }
+            
+            // Right side faces (connecting right contour top to bottom, in reverse order)
+            for (UIndex i = 0; i < numSegments; ++i) {
+                UIndex right_i = 2 * numLeftPoints - 1 - i;
+                UIndex right_i1 = 2 * numLeftPoints - 2 - i;
+                UIndex bottom_right_i = numPoints + right_i;
+                UIndex bottom_right_i1 = numPoints + right_i1;
+                
+                // Side triangle 1: R_i_top, R_i_bottom, R_{i+1}_bottom - material 3
+                API_Coord3D p_top = {points[right_i].x - refX, points[right_i].y - refY, points[right_i].z - refZ};
+                API_Coord3D p_bot = {points[right_i].x - refX, points[right_i].y - refY, points[right_i].z - refZ - thickness};
+                API_Coord3D p_bot_next = {points[right_i1].x - refX, points[right_i1].y - refY, points[right_i1].z - refZ - thickness};
+                
+                if (!CreateTriangle(vertexIndices[right_i], vertexIndices[bottom_right_i], vertexIndices[bottom_right_i1],
+                                    p_top, p_bot, p_bot_next, (int)(numTriangles * 2 + numSegments * 2 + i * 2), materialSideAttr)) {
+                    ACAPI_Body_Dispose(&bodyData);
+                    return false;
+                }
+                
+                // Side triangle 2: R_i_top, R_{i+1}_bottom, R_{i+1}_top
+                API_Coord3D p_top_next = {points[right_i1].x - refX, points[right_i1].y - refY, points[right_i1].z - refZ};
+                
+                if (!CreateTriangle(vertexIndices[right_i], vertexIndices[bottom_right_i1], vertexIndices[right_i1],
+                                    p_top, p_bot_next, p_top_next, (int)(numTriangles * 2 + numSegments * 2 + i * 2 + 1), materialSideAttr)) {
+                    ACAPI_Body_Dispose(&bodyData);
+                    return false;
+                }
+            }
+            
+            // Front side (connecting first left and first right points)
+            UIndex left_first = 0;
+            UIndex right_first = 2 * numLeftPoints - 1;
+            UIndex bottom_left_first = numPoints + left_first;
+            UIndex bottom_right_first = numPoints + right_first;
+            
+            // Front triangle 1: L_0_top, L_0_bottom, R_0_bottom - material 3
+            API_Coord3D p_left_top = {points[left_first].x - refX, points[left_first].y - refY, points[left_first].z - refZ};
+            API_Coord3D p_left_bot = {points[left_first].x - refX, points[left_first].y - refY, points[left_first].z - refZ - thickness};
+            API_Coord3D p_right_bot = {points[right_first].x - refX, points[right_first].y - refY, points[right_first].z - refZ - thickness};
+            
+            if (!CreateTriangle(vertexIndices[left_first], vertexIndices[bottom_left_first], vertexIndices[bottom_right_first],
+                                p_left_top, p_left_bot, p_right_bot, (int)(numTriangles * 2 + numSegments * 4), materialSideAttr)) {
+                ACAPI_Body_Dispose(&bodyData);
+                return false;
+            }
+            
+            // Front triangle 2: L_0_top, R_0_bottom, R_0_top
+            API_Coord3D p_right_top = {points[right_first].x - refX, points[right_first].y - refY, points[right_first].z - refZ};
+            
+            if (!CreateTriangle(vertexIndices[left_first], vertexIndices[bottom_right_first], vertexIndices[right_first],
+                                p_left_top, p_right_bot, p_right_top, (int)(numTriangles * 2 + numSegments * 4 + 1), materialSideAttr)) {
+                ACAPI_Body_Dispose(&bodyData);
+                return false;
+            }
+            
+            // Back side (connecting last left and last right points)
+            UIndex left_last = numLeftPoints - 1;
+            UIndex right_last = numLeftPoints; // first point of right contour in our array
+            UIndex bottom_left_last = numPoints + left_last;
+            UIndex bottom_right_last = numPoints + right_last;
+            
+            // Back triangle 1: L_last_top, L_last_bottom, R_last_bottom - material 3
+            API_Coord3D p_left_top_back = {points[left_last].x - refX, points[left_last].y - refY, points[left_last].z - refZ};
+            API_Coord3D p_left_bot_back = {points[left_last].x - refX, points[left_last].y - refY, points[left_last].z - refZ - thickness};
+            API_Coord3D p_right_bot_back = {points[right_last].x - refX, points[right_last].y - refY, points[right_last].z - refZ - thickness};
+            
+            if (!CreateTriangle(vertexIndices[left_last], vertexIndices[bottom_left_last], vertexIndices[bottom_right_last],
+                                p_left_top_back, p_left_bot_back, p_right_bot_back, (int)(numTriangles * 2 + numSegments * 4 + 2), materialSideAttr)) {
+                ACAPI_Body_Dispose(&bodyData);
+                return false;
+            }
+            
+            // Back triangle 2: L_last_top, R_last_bottom, R_last_top
+            API_Coord3D p_right_top_back = {points[right_last].x - refX, points[right_last].y - refY, points[right_last].z - refZ};
+            
+            if (!CreateTriangle(vertexIndices[left_last], vertexIndices[bottom_right_last], vertexIndices[right_last],
+                                p_left_top_back, p_right_bot_back, p_right_top_back, (int)(numTriangles * 2 + numSegments * 4 + 3), materialSideAttr)) {
+                ACAPI_Body_Dispose(&bodyData);
+                return false;
+            }
+            
+            Log("[RoadHelper] Side faces: %d triangles added (left: %d, right: %d, front: 2, back: 2)", 
+                (int)numSideTriangles, (int)(numSegments * 2), (int)(numSegments * 2));
+        }
+        
+        const UIndex totalTriangles = hasThickness ? (numTriangles * 2 + numSegments * 4 + 4) : numTriangles;
+        Log("[RoadHelper] Total %d triangles added, finishing body...", (int)totalTriangles);
+        
+        // Finish body and copy to memo
+        API_ElementMemo memo = {};
+        BNZeroMemory(&memo, sizeof(API_ElementMemo));
+        
+        GSErrCode finishErr = ACAPI_Body_Finish(bodyData, &memo.morphBody, &memo.morphMaterialMapTable);
+        ACAPI_Body_Dispose(&bodyData);
+        
+        if (finishErr != NoError) {
+            Log("[RoadHelper] ERROR: ACAPI_Body_Finish failed, err=%d", (int)finishErr);
+            ACAPI_DisposeElemMemoHdls(&memo);
+            return false;
+        }
+        
+        Log("[RoadHelper] Body finished, creating Morph element...");
+        
+        // Create Morph element
+        GSErrCode createErr = ACAPI_Element_Create(&element, &memo);
+        
+        Log("[RoadHelper] ACAPI_Element_Create returned err=%d", (int)createErr);
+        
+        if (createErr != NoError) {
+            Log("[RoadHelper] ERROR: Failed to create Morph, err=%d", (int)createErr);
+            ACAPI_DisposeElemMemoHdls(&memo);
+            return false;
+        }
+            
+        ACAPI_DisposeElemMemoHdls(&memo);
+        
+        Log("[RoadHelper] SUCCESS: Morph created from %d points with varying Z coordinates (refZ=%.3f m)", 
+            (int)numPoints, refZ);
+        return true;
+    }
+    
+    // Вычисление площади 3D треугольника через векторное произведение
+    static double CalculateTriangleArea3D(const API_Coord3D& a, const API_Coord3D& b, const API_Coord3D& c)
+    {
+        // Векторы от a к b и от a к c
+        double v1x = b.x - a.x, v1y = b.y - a.y, v1z = b.z - a.z;
+        double v2x = c.x - a.x, v2y = c.y - a.y, v2z = c.z - a.z;
+        
+        // Векторное произведение v1 × v2
+        double crossX = v1y * v2z - v1z * v2y;
+        double crossY = v1z * v2x - v1x * v2z;
+        double crossZ = v1x * v2y - v1y * v2x;
+        
+        // Длина вектора = площадь параллелограмма, делим на 2 для площади треугольника
+        double area = 0.5 * std::sqrt(crossX * crossX + crossY * crossY + crossZ * crossZ);
+        return area;
+    }
+    
+    // Вычисление площади верхней поверхности Morph
+    double CalculateMorphSurfaceArea(const GS::Array<API_Coord3D>& points)
+    {
+        const UIndex numPoints = points.GetSize();
+        if (numPoints < 3) {
+            Log("[RoadHelper] ERROR: Need at least 3 points to calculate area");
+            return 0.0;
+        }
+        
+        // Схема триангуляции та же, что при создании Morph
+        const UIndex numLeftPoints = numPoints / 2;
+        const UIndex numSegments = numLeftPoints - 1;
+        
+        double totalArea = 0.0;
+        
+        for (UIndex i = 0; i < numSegments; ++i) {
+            UIndex left_i = i;
+            UIndex left_i1 = i + 1;
+            UIndex right_i = 2 * numLeftPoints - 1 - i;
+            UIndex right_i1 = 2 * numLeftPoints - 2 - i;
+            
+            // Triangle 1: L_i, R_i, L_{i+1}
+            double area1 = CalculateTriangleArea3D(
+                points[left_i],
+                points[right_i],
+                points[left_i1]
+            );
+            
+            // Triangle 2: L_{i+1}, R_i, R_{i+1}
+            double area2 = CalculateTriangleArea3D(
+                points[left_i1],
+                points[right_i],
+                points[right_i1]
+            );
+            
+            totalArea += area1 + area2;
+        }
+        
+        Log("[RoadHelper] Calculated surface area: %.3f m² (%d triangles)", totalArea, (int)(numSegments * 2));
+        return totalArea;
+    }
+    
+    // Создание текстовой выноски с площадью
+    bool CreateAreaLabel(const API_Coord& position, double areaM2)
+    {
+        Log("[RoadHelper] CreateAreaLabel: creating text label at (%.3f, %.3f) with area %.3f m2", 
+            position.x, position.y, areaM2);
+        
+        API_Element element = {};
+        element.header.type = API_TextID;
+        
+        GSErrCode err = ACAPI_Element_GetDefaults(&element, nullptr);
+        if (err != NoError) {
+            Log("[RoadHelper] ERROR: ACAPI_Element_GetDefaults failed for text, err=%d", (int)err);
+            return false;
+        }
+        
+        // Устанавливаем позицию и параметры текста
+        element.text.loc = position;
+        element.text.anchor = APIAnc_LB; // Left Bottom - горизонтальная ориентация
+        element.text.width = 100.0; // Фиксированная ширина для горизонтального текста
+        element.text.nonBreaking = true; // Без переноса строк
+        element.text.charCode = CC_Legacy; // Используем Legacy кодировку для простоты
+        
+        // Формируем текст с площадью (используем простой текст)
+        char textBuf[256];
+        snprintf(textBuf, sizeof(textBuf), "S = %.2f m2", areaM2);
+        
+        API_ElementMemo memo = {};
+        BNZeroMemory(&memo, sizeof(API_ElementMemo));
+        
+        // Выделяем память для текста (Legacy)
+        const UInt32 textLen = (UInt32)strlen(textBuf);
+        memo.textContent = BMhAll((GSSize)textLen + 1);
+        if (memo.textContent == nullptr) {
+            Log("[RoadHelper] ERROR: Failed to allocate memory for text content");
+            return false;
+        }
+        
+        // Копируем текст
+        strcpy(*memo.textContent, textBuf);
+        
+        // Создаем текстовый элемент
+        err = ACAPI_CallUndoableCommand("Create Area Label", [&]() -> GSErrCode {
+            return ACAPI_Element_Create(&element, &memo);
+        });
+        
+        ACAPI_DisposeElemMemoHdls(&memo);
+        
+        if (err != NoError) {
+            Log("[RoadHelper] ERROR: Failed to create text element, err=%d", (int)err);
+            return false;
+        }
+        
+        Log("[RoadHelper] SUCCESS: Area label created: %s", textBuf);
+        return true;
+    }
+    
+    // Создание Morph из произвольного количества точек (публичная функция)
+    bool CreateMorphFromPoints(const GS::Array<API_Coord3D>& points, double thicknessMM,
+                                API_AttributeIndex materialTop, API_AttributeIndex materialBottom, API_AttributeIndex materialSide)
+    {
+        return ACAPI_CallUndoableCommand("Create Morph from Points", [&]() -> GSErrCode {
+            return CreateMorphFromPointsInternal(points, thicknessMM, materialTop, materialBottom, materialSide) ? NoError : APIERR_GENERAL;
+        }) == NoError;
+    }
+    
+    // Кэш для списка покрытий (чтобы не загружать каждый раз)
+    static GS::Array<SurfaceFinishInfo> g_cachedFinishes;
+    static bool g_finishesCacheValid = false;
+    
+    // Получить список всех доступных покрытий (материалы - они используются как покрытия/текстуры)
+    GS::Array<SurfaceFinishInfo> GetSurfaceFinishesList()
+    {
+        // Возвращаем кэш, если он валиден
+        if (g_finishesCacheValid && g_cachedFinishes.GetSize() > 0) {
+            return g_cachedFinishes;
+        }
+        
+        // Очищаем кэш и загружаем заново
+        g_cachedFinishes.Clear();
+        
+        GS::Array<API_Attribute> attributes;
+        GSErrCode err = ACAPI_Attribute_GetAttributesByType(API_MaterialID, attributes);
+        
+        if (err == NoError) {
+            for (UIndex i = 0; i < attributes.GetSize(); ++i) {
+                SurfaceFinishInfo info;
+                // Получаем числовой индекс из API_AttributeIndex
+                // Используем порядковый номер + 1, так как индексы начинаются с 1
+                info.index = (Int32)(i + 1);
+                info.name = attributes[i].header.name;
+                g_cachedFinishes.Push(info);
+            }
+            g_finishesCacheValid = true;
+        }
+        
+        return g_cachedFinishes;
+    }
+    
+    // Сбросить кэш покрытий (вызывать при изменении материалов в проекте)
+    void InvalidateSurfaceFinishesCache()
+    {
+        g_finishesCacheValid = false;
+        g_cachedFinishes.Clear();
     }
 
 } // namespace RoadHelper

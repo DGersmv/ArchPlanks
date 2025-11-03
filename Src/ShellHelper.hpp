@@ -45,6 +45,15 @@ namespace ShellHelper {
 	bool CreateShellFromLine(double widthMM, double stepMM);
 	bool CreateTestMesh();
 	bool CreateSimpleShell();
+	bool CreateMeshFromPoints(const GS::Array<API_Coord3D>& points);
+	bool CreateMeshFromContour(double widthMM, double stepMM);
+	
+	// Создать контуры и Morph из них
+	// materialTop, materialBottom, materialSide: индексы материалов для граней
+	bool CreateMorphFromContour(double widthMM, double stepMM, double thicknessMM = 0.0,
+	                            API_AttributeIndex materialTop = ACAPI_CreateAttributeIndex(1),
+	                            API_AttributeIndex materialBottom = ACAPI_CreateAttributeIndex(2),
+	                            API_AttributeIndex materialSide = ACAPI_CreateAttributeIndex(3));
 
 	// Анализ базовой линии и генерация перпендикуляров/проекция на mesh
 	GS::Array<API_Coord3D> AnalyzeBaseLine(const API_Guid& lineGuid, double stepMM);

@@ -451,13 +451,16 @@ namespace LandscapeHelper {
 				e.lamp.angle = ang; 
 			}
 			else if (tid == API_BeamID) {
-				// Балка: вычисляем конечную точку на основе длины из прототипа и угла
+				// Балка: размещаем по центру (середина балки совпадает с точкой P на пути)
 				const double beamLen = std::hypot(
 					proto.beam.endC.x - proto.beam.begC.x,
 					proto.beam.endC.y - proto.beam.begC.y);
-				e.beam.begC = P;
-				e.beam.endC.x = P.x + beamLen * std::cos(ang);
-				e.beam.endC.y = P.y + beamLen * std::sin(ang);
+				// Новая балка: середина в точке P, направление по углу пути
+				const double halfLen = beamLen * 0.5;
+				e.beam.begC.x = P.x - halfLen * std::cos(ang);
+				e.beam.begC.y = P.y - halfLen * std::sin(ang);
+				e.beam.endC.x = P.x + halfLen * std::cos(ang);
+				e.beam.endC.y = P.y + halfLen * std::sin(ang);
 			}
 			else if (tid == API_ColumnID) { 
 				// Колонна: устанавливаем позицию и угол поворота

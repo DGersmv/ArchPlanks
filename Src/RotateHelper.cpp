@@ -47,15 +47,23 @@ bool RotateSelected (double angleDeg)
                 ACAPI_ELEMENT_MASK_SET(mask, API_LampType, angle);
                 break;
             case API_BeamID: {
-                // Поворот балки в плоскости XY - меняем направление begC -> endC
+                // Поворот балки в плоскости XY вокруг центра балки (поворот вокруг оси Z)
                 const double dx = element.beam.endC.x - element.beam.begC.x;
                 const double dy = element.beam.endC.y - element.beam.begC.y;
                 const double beamLength = std::hypot(dx, dy);
+                const double halfLength = beamLength / 2.0;
                 const double currentAngle = std::atan2(dy, dx);
                 const double newAngle = currentAngle + addRad;
                 
-                element.beam.endC.x = element.beam.begC.x + beamLength * std::cos(newAngle);
-                element.beam.endC.y = element.beam.begC.y + beamLength * std::sin(newAngle);
+                // Центр балки
+                const double centerX = (element.beam.begC.x + element.beam.endC.x) / 2.0;
+                const double centerY = (element.beam.begC.y + element.beam.endC.y) / 2.0;
+                
+                // Поворот обеих точек вокруг центра
+                element.beam.begC.x = centerX - halfLength * std::cos(newAngle);
+                element.beam.begC.y = centerY - halfLength * std::sin(newAngle);
+                element.beam.endC.x = centerX + halfLength * std::cos(newAngle);
+                element.beam.endC.y = centerY + halfLength * std::sin(newAngle);
                 
                 ACAPI_ELEMENT_MASK_SET(mask, API_BeamType, begC);
                 ACAPI_ELEMENT_MASK_SET(mask, API_BeamType, endC);
@@ -116,13 +124,21 @@ bool AlignSelectedX ()
                 ACAPI_ELEMENT_MASK_SET(mask, API_LampType, angle); 
                 break;
             case API_BeamID: {
-                // Выравнивание балки по X - поворачиваем в плоскости XY
+                // Выравнивание балки по X вокруг центра балки - поворачиваем в плоскости XY
                 const double dx = element.beam.endC.x - element.beam.begC.x;
                 const double dy = element.beam.endC.y - element.beam.begC.y;
                 const double beamLength = std::hypot(dx, dy);
+                const double halfLength = beamLength / 2.0;
                 
-                element.beam.endC.x = element.beam.begC.x + beamLength; // Вдоль оси X
-                element.beam.endC.y = element.beam.begC.y;              // Y не меняется
+                // Центр балки
+                const double centerX = (element.beam.begC.x + element.beam.endC.x) / 2.0;
+                const double centerY = (element.beam.begC.y + element.beam.endC.y) / 2.0;
+                
+                // Выравниваем балку по X вокруг центра
+                element.beam.begC.x = centerX - halfLength; // Вдоль оси X
+                element.beam.begC.y = centerY;              // Y не меняется
+                element.beam.endC.x = centerX + halfLength;
+                element.beam.endC.y = centerY;
                 
                 ACAPI_ELEMENT_MASK_SET(mask, API_BeamType, begC);
                 ACAPI_ELEMENT_MASK_SET(mask, API_BeamType, endC);
@@ -189,13 +205,21 @@ bool RandomizeSelectedAngles ()
                 ACAPI_ELEMENT_MASK_SET(mask, API_ColumnType, axisRotationAngle); 
                 break;
             case API_BeamID: {
-                // Случайный поворот балки в плоскости XY
+                // Случайный поворот балки в плоскости XY вокруг центра (поворот вокруг оси Z)
                 const double dx = element.beam.endC.x - element.beam.begC.x;
                 const double dy = element.beam.endC.y - element.beam.begC.y;
                 const double beamLength = std::hypot(dx, dy);
+                const double halfLength = beamLength / 2.0;
                 
-                element.beam.endC.x = element.beam.begC.x + beamLength * std::cos(rnd);
-                element.beam.endC.y = element.beam.begC.y + beamLength * std::sin(rnd);
+                // Центр балки
+                const double centerX = (element.beam.begC.x + element.beam.endC.x) / 2.0;
+                const double centerY = (element.beam.begC.y + element.beam.endC.y) / 2.0;
+                
+                // Случайный поворот вокруг центра
+                element.beam.begC.x = centerX - halfLength * std::cos(rnd);
+                element.beam.begC.y = centerY - halfLength * std::sin(rnd);
+                element.beam.endC.x = centerX + halfLength * std::cos(rnd);
+                element.beam.endC.y = centerY + halfLength * std::sin(rnd);
                 
                 ACAPI_ELEMENT_MASK_SET(mask, API_BeamType, begC);
                 ACAPI_ELEMENT_MASK_SET(mask, API_BeamType, endC);
@@ -246,7 +270,7 @@ bool OrientObjectsToPoint ()
             case API_ObjectID: objPos = element.object.pos; break;
             case API_LampID:   objPos = element.lamp.pos;   break;
             case API_ColumnID: objPos.x = element.column.origoPos.x; objPos.y = element.column.origoPos.y; break;
-            case API_BeamID:   objPos = element.beam.begC; break;  // Используем начальную точку балки
+            case API_BeamID:   objPos.x = (element.beam.begC.x + element.beam.endC.x) / 2.0; objPos.y = (element.beam.begC.y + element.beam.endC.y) / 2.0; break;  // Используем центр балки
             default: continue;
             }
 
@@ -273,13 +297,21 @@ bool OrientObjectsToPoint ()
                 ACAPI_ELEMENT_MASK_SET(mask, API_ColumnType, axisRotationAngle); 
                 break;
             case API_BeamID: {
-                // Ориентация балки в плоскости XY - направляем begC -> endC к целевой точке
+                // Ориентация балки в плоскости XY вокруг центра балки - направляем к целевой точке
                 const double beamDx = element.beam.endC.x - element.beam.begC.x;
                 const double beamDy = element.beam.endC.y - element.beam.begC.y;
                 const double beamLength = std::hypot(beamDx, beamDy);
+                const double halfLength = beamLength / 2.0;
                 
-                element.beam.endC.x = element.beam.begC.x + beamLength * std::cos(newAngle);
-                element.beam.endC.y = element.beam.begC.y + beamLength * std::sin(newAngle);
+                // Центр балки
+                const double centerX = (element.beam.begC.x + element.beam.endC.x) / 2.0;
+                const double centerY = (element.beam.begC.y + element.beam.endC.y) / 2.0;
+                
+                // Ориентируем балку вокруг центра к целевой точке
+                element.beam.begC.x = centerX - halfLength * std::cos(newAngle);
+                element.beam.begC.y = centerY - halfLength * std::sin(newAngle);
+                element.beam.endC.x = centerX + halfLength * std::cos(newAngle);
+                element.beam.endC.y = centerY + halfLength * std::sin(newAngle);
                 
                 ACAPI_ELEMENT_MASK_SET(mask, API_BeamType, begC);
                 ACAPI_ELEMENT_MASK_SET(mask, API_BeamType, endC);

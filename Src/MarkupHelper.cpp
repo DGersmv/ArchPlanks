@@ -13,6 +13,8 @@
 #include <cmath>
 #include <algorithm>
 #include <limits>
+#include <map>
+#include <set>
 
 namespace MarkupHelper {
 
@@ -241,6 +243,224 @@ namespace MarkupHelper {
 			seg.L = best.L;
 			if (seg.L > 1e-9) out.push_back(seg);
 		}
+	}
+
+	// ============================================================================
+	// Получение контура линии как сегментов (Line, PolyLine, Arc, Spline)
+	// ============================================================================
+	static bool GetLineContourSegments(const API_Guid& guid, std::vector<ContourSeg>& segments)
+	{
+		segments.clear();
+
+		API_Element elem = {};
+		elem.header.guid = guid;
+		if (ACAPI_Element_Get(&elem) != NoError) {
+			return false;
+		}
+
+		const API_ElemTypeID tid = elem.header.type.typeID;
+
+		// Простая линия (Line)
+		if (tid == API_LineID) {
+			ContourSeg seg;
+			seg.kind = ContourSeg::Line;
+			seg.a = Vec2(elem.line.begC);
+			seg.b = Vec2(elem.line.endC);
+			seg.L = (seg.b - seg.a).length();
+			if (seg.L > 1e-9) {
+				segments.push_back(seg);
+			}
+			return !segments.empty();
+		}
+
+		// Дуга (Arc)
+		if (tid == API_ArcID) {
+			ContourSeg seg;
+			seg.kind = ContourSeg::Arc;
+			seg.c = Vec2(elem.arc.origC);
+			seg.r = elem.arc.r;
+			seg.a0 = elem.arc.begAng;
+			seg.a1 = elem.arc.endAng;
+			double sweep = seg.a1 - seg.a0;
+			if (sweep < 0.0) sweep += 2.0 * PI;
+			seg.L = seg.r * sweep;
+			if (seg.L > 1e-9) {
+				segments.push_back(seg);
+			}
+			return !segments.empty();
+		}
+
+		// Полилиния (PolyLine)
+		if (tid == API_PolyLineID) {
+			API_ElementMemo memo = {};
+			GSErrCode e = ACAPI_Element_GetMemo(guid, &memo, APIMemoMask_Polygon);
+			if (e != NoError || memo.coords == nullptr) {
+				ACAPI_DisposeElemMemoHdls(&memo);
+				return false;
+			}
+
+			const Int32 nAll = (Int32)(BMGetHandleSize((GSHandle)memo.coords) / sizeof(API_Coord));
+			const Int32 nPts = std::max<Int32>(0, nAll - 1);
+			if (nPts < 2) {
+				ACAPI_DisposeElemMemoHdls(&memo);
+				return false;
+			}
+
+			// Карта дуг
+			std::map<Int32, double> arcByBeg;
+			if (memo.parcs != nullptr) {
+				const Int32 nArcs = (Int32)(BMGetHandleSize((GSHandle)memo.parcs) / sizeof(API_PolyArc));
+				for (Int32 ai = 1; ai <= nArcs; ++ai) {
+					const API_PolyArc& pa = (*memo.parcs)[ai];
+					if (pa.begIndex >= 1 && pa.begIndex <= nPts - 1) {
+						arcByBeg[pa.begIndex] = pa.arcAngle;
+					}
+				}
+			}
+
+			// Строим сегменты
+			for (Int32 i = 1; i <= nPts - 1; ++i) {
+				const API_Coord& p1 = (*memo.coords)[i];
+				const API_Coord& p2 = (*memo.coords)[i + 1];
+
+				auto arcIt = arcByBeg.find(i);
+				if (arcIt != arcByBeg.end() && std::fabs(arcIt->second) > 1e-9) {
+					// Это дуга - используем более точную логику
+					API_Coord coord1 = p1;
+					API_Coord coord2 = p2;
+					double arcAngle = arcIt->second;
+					
+					// Нормируем угол в (-π, π]
+					double phi = arcAngle;
+					while (phi <= -PI) phi += 2.0 * PI;
+					while (phi > PI)  phi -= 2.0 * PI;
+					
+					if (std::fabs(phi) < 1e-9) {
+						// Фактически прямая - обрабатываем как линию
+						ContourSeg seg;
+						seg.kind = ContourSeg::Line;
+						seg.a = Vec2(coord1);
+						seg.b = Vec2(coord2);
+						seg.L = (seg.b - seg.a).length();
+						if (seg.L > 1e-9) {
+							segments.push_back(seg);
+						}
+						continue;
+					}
+					
+					// Вычисляем параметры дуги
+					const double L = std::hypot(coord2.x - coord1.x, coord2.y - coord1.y);
+					if (L <= 1e-9) continue;
+					
+					double r = (0.5 * L) / std::sin(0.5 * phi);
+					if (r < 1e-9) continue;
+					
+					// Центр дуги
+					const double midX = 0.5 * (coord1.x + coord2.x);
+					const double midY = 0.5 * (coord1.y + coord2.y);
+					const double perpLen = std::sqrt(r * r - (0.5 * L) * (0.5 * L));
+					
+					// Угол перпендикуляра
+					double segAng = std::atan2(coord2.y - coord1.y, coord2.x - coord1.x);
+					double perpAng = segAng + (phi > 0 ? PI / 2.0 : -PI / 2.0);
+					
+					Vec2 center(midX + perpLen * std::cos(perpAng), midY + perpLen * std::sin(perpAng));
+					
+					// Углы от центра
+					double a0 = std::atan2(coord1.y - center.y, coord1.x - center.x);
+					double a1 = std::atan2(coord2.y - center.y, coord2.x - center.x);
+					
+					ContourSeg seg;
+					seg.kind = ContourSeg::Arc;
+					seg.c = center;
+					seg.r = r;
+					seg.a0 = a0;
+					seg.a1 = a1;
+					
+					double sweep = a1 - a0;
+					if (sweep < 0.0) sweep += 2.0 * PI;
+					seg.L = r * sweep;
+					
+					if (seg.L > 1e-9) {
+						segments.push_back(seg);
+					}
+				} else {
+					// Это прямая линия
+					ContourSeg seg;
+					seg.kind = ContourSeg::Line;
+					seg.a = Vec2(p1);
+					seg.b = Vec2(p2);
+					seg.L = (seg.b - seg.a).length();
+					if (seg.L > 1e-9) {
+						segments.push_back(seg);
+					}
+				}
+			}
+
+			ACAPI_DisposeElemMemoHdls(&memo);
+			return !segments.empty();
+		}
+
+		// Сплайн (Spline)
+		if (tid == API_SplineID) {
+			API_ElementMemo memo = {};
+			GSErrCode e = ACAPI_Element_GetMemo(guid, &memo, APIMemoMask_All);
+			if (e != NoError || memo.coords == nullptr) {
+				ACAPI_DisposeElemMemoHdls(&memo);
+				return false;
+			}
+
+			const Int32 nAll = (Int32)(BMGetHandleSize((GSHandle)memo.coords) / sizeof(API_Coord));
+			const Int32 nPts = std::max<Int32>(0, nAll - 1);
+			if (nPts < 2) {
+				ACAPI_DisposeElemMemoHdls(&memo);
+				return false;
+			}
+
+			// Для сплайна создаем линейные сегменты между контрольными точками
+			// Или используем bezierDirs для более точного представления
+			if (memo.bezierDirs != nullptr) {
+				// Используем кубические кривые Безье
+				const Int32 nDirs = (Int32)(BMGetHandleSize((GSHandle)memo.bezierDirs) / sizeof(API_SplineDir));
+				for (Int32 i = 1; i <= nPts - 1 && i <= nDirs; ++i) {
+					const API_Coord& p1 = (*memo.coords)[i];
+					const API_Coord& p2 = (*memo.coords)[i + 1];
+					const API_SplineDir& dir1 = (*memo.bezierDirs)[i];
+					const API_SplineDir& dir2 = (*memo.bezierDirs)[i + 1];
+
+					// Упрощаем: создаем сегмент как прямую линию
+					// Для более точного представления можно аппроксимировать Безье
+					ContourSeg seg;
+					seg.kind = ContourSeg::Line;
+					seg.a = Vec2(p1);
+					seg.b = Vec2(p2);
+					seg.L = (seg.b - seg.a).length();
+					if (seg.L > 1e-9) {
+						segments.push_back(seg);
+					}
+				}
+			} else {
+				// Простые линейные сегменты
+				for (Int32 i = 1; i <= nPts - 1; ++i) {
+					const API_Coord& p1 = (*memo.coords)[i];
+					const API_Coord& p2 = (*memo.coords)[i + 1];
+
+					ContourSeg seg;
+					seg.kind = ContourSeg::Line;
+					seg.a = Vec2(p1);
+					seg.b = Vec2(p2);
+					seg.L = (seg.b - seg.a).length();
+					if (seg.L > 1e-9) {
+						segments.push_back(seg);
+					}
+				}
+			}
+
+			ACAPI_DisposeElemMemoHdls(&memo);
+			return !segments.empty();
+		}
+
+		return false;
 	}
 
 	// ============================================================================
@@ -610,11 +830,20 @@ namespace MarkupHelper {
 			if (ACAPI_Element_GetHeader(&h.header) != NoError) continue;
 
 			const API_ElemTypeID tid = h.header.type.typeID;
-			if (tid != API_MeshID && tid != API_SlabID && tid != API_WallID && tid != API_ShellID)
-				continue;
-
+			
 			ElementContourData d; d.guid = n.guid;
-			if (GetElementContourSegments(n.guid, d.segments) && !d.segments.empty()) {
+			bool gotSegments = false;
+			
+			// Проверяем элементы (Mesh, Slab, Shell, Wall)
+			if (tid == API_MeshID || tid == API_SlabID || tid == API_WallID || tid == API_ShellID) {
+				gotSegments = GetElementContourSegments(n.guid, d.segments);
+			}
+			// Проверяем линии (Line, PolyLine, Arc, Spline)
+			else if (tid == API_LineID || tid == API_PolyLineID || tid == API_ArcID || tid == API_SplineID) {
+				gotSegments = GetLineContourSegments(n.guid, d.segments);
+			}
+			
+			if (gotSegments && !d.segments.empty()) {
 				// Вычисляем общую длину контура
 				d.totalLength = 0.0;
 				for (const ContourSeg& seg : d.segments) {

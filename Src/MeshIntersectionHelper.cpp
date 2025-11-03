@@ -16,3 +16,7 @@ bool MeshIntersectionHelper::GetZAndNormal(const API_Coord& xy, double& outZ, AP
     return GroundHelper::GetGroundZAndNormal(pos3D, outZ, outNormal);
 }
 
+
+
+
+

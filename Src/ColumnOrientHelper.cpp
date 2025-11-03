@@ -1,5 +1,5 @@
 // ============================================================================
-// ColumnOrientHelper.cpp — ориентация колонн по поверхности mesh
+// ColumnOrientHelper.cpp — ориентация балок по поверхности mesh
 // ============================================================================
 
 #include "ColumnOrientHelper.hpp"
@@ -14,7 +14,6 @@
 #include <cstdarg>
 
 // ------------------ Globals ------------------
-static GS::Array<API_Guid> g_columnGuids;
 static GS::Array<API_Guid> g_beamGuids;
 static API_Guid g_meshGuid = APINULLGuid;
 
@@ -30,38 +29,14 @@ static inline void Log(const char* fmt, ...)
     GS::UniString s(buf);
     if (BrowserRepl::HasInstance())
         BrowserRepl::GetInstance().LogToBrowser(s);
+#ifdef DEBUG_UI_LOGS
     ACAPI_WriteReport("%s", false, s.ToCStr().Get());
+#endif
 }
 
 // ================================================================
 // Public API
 // ================================================================
-
-bool ColumnOrientHelper::SetColumns()
-{
-    Log("[ColumnOrient] SetColumns ENTER");
-    g_columnGuids.Clear();
-
-    API_SelectionInfo selInfo{};
-    GS::Array<API_Neig> selNeigs;
-    ACAPI_Selection_Get(&selInfo, &selNeigs, false, false);
-    BMKillHandle((GSHandle*)&selInfo.marquee.coords);
-
-    Log("[ColumnOrient] neigs=%d", (int)selNeigs.GetSize());
-    for (const API_Neig& n : selNeigs) {
-        API_Element el{};
-        el.header.guid = n.guid;
-        if (ACAPI_Element_Get(&el) != NoError) continue;
-        
-        if (el.header.type.typeID == API_ColumnID) {
-            g_columnGuids.Push(n.guid);
-            Log("[ColumnOrient] accept column %s", APIGuidToString(n.guid).ToCStr().Get());
-        }
-    }
-
-    Log("[ColumnOrient] SetColumns EXIT: count=%u", (unsigned)g_columnGuids.GetSize());
-    return !g_columnGuids.IsEmpty();
-}
 
 bool ColumnOrientHelper::SetBeams()
 {
@@ -91,7 +66,7 @@ bool ColumnOrientHelper::SetBeams()
 
 bool ColumnOrientHelper::SetMesh()
 {
-    Log("[ColumnOrient] SetMesh ENTER");
+    Log("[BeamOrient] SetMesh ENTER");
     g_meshGuid = APINULLGuid;
     
     // Получаем mesh из выделения
@@ -109,186 +84,13 @@ bool ColumnOrientHelper::SetMesh()
             // Также устанавливаем в GroundHelper для MeshIntersectionHelper
             // Используем прямую установку по GUID
             GroundHelper::SetGroundSurfaceByGuid(n.guid);
-            Log("[ColumnOrient] SetMesh: %s", APIGuidToString(n.guid).ToCStr().Get());
+            Log("[BeamOrient] SetMesh: %s", APIGuidToString(n.guid).ToCStr().Get());
             return true;
         }
     }
 
-    Log("[ColumnOrient] SetMesh EXIT: failed - no mesh in selection");
+    Log("[BeamOrient] SetMesh EXIT: failed - no mesh in selection");
     return false;
-}
-
-// Вычисляет угол наклона оси из нормали поверхности
-static void ComputeTiltFromNormal(const API_Vector3D& normal, double& outTiltAngle, double& outTiltDirection)
-{
-    // Нормализуем нормаль на всякий случай
-    double len = std::sqrt(normal.x * normal.x + normal.y * normal.y + normal.z * normal.z);
-    if (len < 1e-9) {
-        // Вертикальная нормаль (поверхность горизонтальная)
-        outTiltAngle = 0.0;
-        outTiltDirection = 0.0;
-        return;
-    }
-    
-    double nx = normal.x / len;
-    double ny = normal.y / len;
-    double nz = normal.z / len;
-    
-    // Угол наклона от вертикали (0 = вертикально вверх, PI/2 = горизонтально)
-    // Используем z-компоненту нормали: для вертикальной нормали z=1, для горизонтальной z=0
-    outTiltAngle = std::acos(std::max(-1.0, std::min(1.0, nz)));
-    
-    // Направление наклона в плоскости XY (азимут) - проекция нормали на плоскость XY
-    outTiltDirection = std::atan2(ny, nx);
-}
-
-bool ColumnOrientHelper::OrientColumnsToSurface()
-{
-    Log("[ColumnOrient] OrientColumnsToSurface ENTER");
-    
-    // Если колонны не установлены, но балки есть - используем балки
-    if (g_columnGuids.IsEmpty() && !g_beamGuids.IsEmpty()) {
-        Log("[ColumnOrient] No columns, but beams found - using OrientBeamsToSurface instead");
-        return OrientBeamsToSurface();
-    }
-    
-    if (g_columnGuids.IsEmpty()) {
-        Log("[ColumnOrient] ERR: no columns set");
-        return false;
-    }
-    
-    if (g_meshGuid == APINULLGuid) {
-        Log("[ColumnOrient] ERR: mesh not set, call SetMesh() first");
-        return false;
-    }
-
-    // Убеждаемся, что mesh установлен в GroundHelper для MeshIntersectionHelper
-    // (MeshIntersectionHelper использует GroundHelper внутри)
-    
-    // Устанавливаем mesh в GroundHelper напрямую по сохранённому GUID
-    // Не используем SetGroundSurface(), так как в выделении могут быть только колонны
-    if (!GroundHelper::SetGroundSurfaceByGuid(g_meshGuid)) {
-        Log("[ColumnOrient] ERR: failed to set mesh in GroundHelper");
-        return false;
-    }
-
-    const GSErr cmdErr = ACAPI_CallUndoableCommand("Orient Columns to Surface", [&]() -> GSErr {
-        UInt32 oriented = 0;
-        
-        for (const API_Guid& colGuid : g_columnGuids) {
-            API_Element col{};
-            col.header.guid = colGuid;
-            if (ACAPI_Element_Get(&col) != NoError) {
-                Log("[ColumnOrient] failed to get column %s", APIGuidToString(colGuid).ToCStr().Get());
-                continue;
-            }
-            
-            if (col.header.type.typeID != API_ColumnID) continue;
-            
-            // Загружаем memo колонны для проверки наличия полей для наклона
-            API_ElementMemo memo{};
-            bool hasMemo = (ACAPI_Element_GetMemo(colGuid, &memo, APIMemoMask_All) == NoError);
-
-            // Получаем XY координаты колонны
-            API_Coord xy = col.column.origoPos;
-            
-            // Получаем Z и нормаль через MeshIntersectionHelper
-            double z = 0.0;
-            API_Vector3D normal = { 0.0, 0.0, 1.0 };
-            
-            if (!MeshIntersectionHelper::GetZAndNormal(xy, z, normal)) {
-                Log("[ColumnOrient] failed to get surface normal for column at (%.3f, %.3f)", xy.x, xy.y);
-                continue;
-            }
-            
-            // Вычисляем углы наклона из нормали
-            double tiltAngle = 0.0;
-            double tiltDirection = 0.0;
-            ComputeTiltFromNormal(normal, tiltAngle, tiltDirection);
-            
-            Log("[ColumnOrient] Column %s: normal=(%.3f,%.3f,%.3f) tiltAngle=%.3fdeg tiltDir=%.3fdeg",
-                APIGuidToString(colGuid).ToCStr().Get(),
-                normal.x, normal.y, normal.z,
-                tiltAngle * 180.0 / 3.14159265358979323846,
-                tiltDirection * 180.0 / 3.14159265358979323846);
-            
-            // Устанавливаем ориентацию колонны на основе нормали поверхности
-            // axisRotationAngle - поворот вокруг вертикальной оси (Z)
-            // Для наклона оси колонны используется другой параметр
-            
-            API_Element mask{};
-            ACAPI_ELEMENT_MASK_CLEAR(mask);
-            
-            // Сохраняем текущие значения
-            const double currentAxisRotation = col.column.axisRotationAngle;
-            
-            Log("[ColumnOrient] Column current axisRotationAngle=%.3fdeg, tiltAngle=%.3fdeg, tiltDir=%.3fdeg",
-                currentAxisRotation * 180.0 / 3.14159265358979323846,
-                tiltAngle * 180.0 / 3.14159265358979323846,
-                tiltDirection * 180.0 / 3.14159265358979323846);
-            
-            // У колонн есть параметры для наклона:
-            // - isSlanted - булево, наклонена ли колонна
-            // - slantAngle - угол наклона (в радианах)
-            // - slantDirectionAngle - направление наклона в горизонтальной плоскости (в радианах)
-            
-            if (tiltAngle > 1e-6) {
-                // Колонна наклонена
-                col.column.isSlanted = true;
-                col.column.slantAngle = tiltAngle;
-                col.column.slantDirectionAngle = tiltDirection;
-                
-                ACAPI_ELEMENT_MASK_SET(mask, API_ColumnType, isSlanted);
-                ACAPI_ELEMENT_MASK_SET(mask, API_ColumnType, slantAngle);
-                ACAPI_ELEMENT_MASK_SET(mask, API_ColumnType, slantDirectionAngle);
-                
-                Log("[ColumnOrient] Setting isSlanted=true, slantAngle=%.3fdeg, slantDirectionAngle=%.3fdeg",
-                    tiltAngle * 180.0 / 3.14159265358979323846,
-                    tiltDirection * 180.0 / 3.14159265358979323846);
-            } else {
-                // Колонна вертикальная
-                col.column.isSlanted = false;
-                col.column.slantAngle = 0.0;
-                col.column.slantDirectionAngle = 0.0;
-                
-                ACAPI_ELEMENT_MASK_SET(mask, API_ColumnType, isSlanted);
-                ACAPI_ELEMENT_MASK_SET(mask, API_ColumnType, slantAngle);
-                ACAPI_ELEMENT_MASK_SET(mask, API_ColumnType, slantDirectionAngle);
-                
-                Log("[ColumnOrient] Setting isSlanted=false (vertical column)");
-            }
-            
-            // axisRotationAngle - это поворот вокруг оси колонны (не меняем)
-            // Оставляем текущее значение axisRotationAngle без изменений
-            
-            GSErr chg = NoError;
-            if (hasMemo) {
-                // Используем memo при изменении колонны
-                chg = ACAPI_Element_Change(&col, &mask, &memo, 0, true);
-                ACAPI_DisposeElemMemoHdls(&memo);
-            } else {
-                // Изменяем без memo
-                chg = ACAPI_Element_Change(&col, &mask, nullptr, 0, true);
-            }
-            
-            if (chg == NoError) {
-                Log("[ColumnOrient] SUCCESS: Column %s oriented (axisRotationAngle=%.3fdeg, tiltAngle=%.3fdeg - parameter name needed)",
-                    APIGuidToString(colGuid).ToCStr().Get(),
-                    tiltDirection * 180.0 / 3.14159265358979323846,
-                    tiltAngle * 180.0 / 3.14159265358979323846);
-                oriented++;
-            } else {
-                Log("[ColumnOrient] FAILED: Column %s change error=%d",
-                    APIGuidToString(colGuid).ToCStr().Get(), (int)chg);
-            }
-        }
-        
-        Log("[ColumnOrient] Oriented %u columns", (unsigned)oriented);
-        return NoError;
-    });
-
-    Log("[ColumnOrient] OrientColumnsToSurface EXIT (err=%d)", (int)cmdErr);
-    return (cmdErr == NoError);
 }
 
 bool ColumnOrientHelper::OrientBeamsToSurface()
@@ -360,7 +162,6 @@ bool ColumnOrientHelper::OrientBeamsToSurface()
             const double currentAngle = std::atan2(dy, dx);
             
             // Вычисляем угол наклона поверхности (угол между нормалью и вертикалью)
-            // Этот угол напрямую используется для profileAngle - поворота профиля вокруг оси балки
             double tiltAngle = std::acos(std::max(-1.0, std::min(1.0, normal.z)));
             
             double rotationAngle = 0.0;
@@ -369,7 +170,6 @@ bool ColumnOrientHelper::OrientBeamsToSurface()
             if (tiltAngle < 0.01) { // меньше ~0.57 градусов - считаем горизонтальной
                 rotationAngle = 0.0;
             } else {
-                // Используем tiltAngle, но определяем знак на основе направления нормали
                 // Проекция нормали на плоскость XY указывает направление наклона
                 double normalXYLen = std::hypot(normal.x, normal.y);
                 if (normalXYLen < 1e-9) {
@@ -382,15 +182,18 @@ bool ColumnOrientHelper::OrientBeamsToSurface()
                     // Стандартное направление профиля (перпендикулярно оси балки)
                     double defaultProfileDir = currentAngle + 1.57079632679489661923; // +90°
                     
-                    // Определяем знак на основе угла между направлением нормали и стандартным направлением профиля
+                    // Определяем угол между направлением нормали и стандартным направлением профиля
                     double angleDiff = normalDir - defaultProfileDir;
                     
                     // Нормализуем разницу углов в диапазон [-PI, PI]
                     while (angleDiff > 3.14159265358979323846) angleDiff -= 2.0 * 3.14159265358979323846;
                     while (angleDiff < -3.14159265358979323846) angleDiff += 2.0 * 3.14159265358979323846;
                     
-                    // Используем tiltAngle с тем же знаком, что и angleDiff
-                    rotationAngle = (angleDiff >= 0.0) ? tiltAngle : -tiltAngle;
+                    // Поворачиваем профиль так, чтобы он был выровнен по нормали
+                    // Используем угол наклона tiltAngle, направление определяется по angleDiff
+                    // Если нормаль перпендикулярна оси балки (angleDiff ≈ 0), используем максимальный tiltAngle
+                    // Если нормаль параллельна оси (angleDiff ≈ ±PI/2), поворот минимальный
+                    rotationAngle = tiltAngle * std::cos(angleDiff);
                 }
             }
             
@@ -482,40 +285,40 @@ bool ColumnOrientHelper::OrientBeamsToSurface()
 bool ColumnOrientHelper::RotateSelected(double angleDeg)
 {
     Log("[RotateOrient] RotateSelected ENTER angleDeg=%.3f", angleDeg);
-    
+
     if (std::abs(angleDeg) < 1e-6) {
         Log("[RotateOrient] Angle is zero, nothing to do");
         return true;
     }
-    
+
     API_SelectionInfo selInfo{};
     GS::Array<API_Neig> selNeigs;
     ACAPI_Selection_Get(&selInfo, &selNeigs, false, false);
     BMKillHandle((GSHandle*)&selInfo.marquee.coords);
-    
+
     if (selNeigs.IsEmpty()) {
         Log("[RotateOrient] No selection");
         return false;
     }
-    
+
     const double angleRad = angleDeg * 3.14159265358979323846 / 180.0;
-    
+
     GSErrCode cmdErr = ACAPI_CallUndoableCommand("Rotate Selected Orientation", [&]() -> GSErrCode {
         unsigned rotated = 0;
-        
+
         for (const API_Neig& n : selNeigs) {
             API_Element element{};
             element.header.guid = n.guid;
             if (ACAPI_Element_Get(&element) != NoError) continue;
-            
+
             API_Element mask{};
             ACAPI_ELEMENT_MASK_CLEAR(mask);
-            
+
             API_ElementMemo memo{};
             bool needsMemo = false;
             bool hasMemo = false;
             bool changed = false;
-            
+
             switch (element.header.type.typeID) {
             case API_BeamID:
                 element.beam.profileAngle += angleRad;
@@ -526,33 +329,35 @@ bool ColumnOrientHelper::RotateSelected(double angleDeg)
                 Log("[RotateOrient] Beam %s: added %.3fdeg to profileAngle",
                     APIGuidToString(n.guid).ToCStr().Get(), angleDeg);
                 break;
-                
+
             default:
                 continue;
             }
-            
+
             if (changed) {
                 GSErrCode chg = NoError;
                 if (needsMemo && hasMemo) {
                     chg = ACAPI_Element_Change(&element, &mask, &memo, 0, true);
                     ACAPI_DisposeElemMemoHdls(&memo);
-                } else {
+                }
+                else {
                     chg = ACAPI_Element_Change(&element, &mask, nullptr, 0, true);
                 }
-                
+
                 if (chg == NoError) {
                     rotated++;
-                } else {
+                }
+                else {
                     Log("[RotateOrient] FAILED to change element %s: error=%d",
                         APIGuidToString(n.guid).ToCStr().Get(), (int)chg);
                 }
             }
         }
-        
+
         Log("[RotateOrient] Rotated %u elements", rotated);
         return NoError;
-    });
-    
+        });
+
     Log("[RotateOrient] RotateSelected EXIT (err=%d)", (int)cmdErr);
     return (cmdErr == NoError);
 }

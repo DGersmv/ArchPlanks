@@ -72,23 +72,31 @@ bool CreateLayerFolder(const GS::UniString& folderPath, GS::Guid& folderGuid)
             
             err = ACAPI_Attribute_CreateFolder(folder);
             if (err != NoError) {
+#ifdef DEBUG_UI_LOGS
                 ACAPI_WriteReport("[LayerHelper] Ошибка создания папки '%s' (код: %d)", true, 
                     GS::UniString::Printf("%s", currentPath[0].ToCStr().Get()).ToCStr().Get(), err);
+#endif
                 return false;
             }
+#ifdef DEBUG_UI_LOGS
             ACAPI_WriteReport("[LayerHelper] Создана папка: %s", false, 
                 GS::UniString::Printf("%s", currentPath[0].ToCStr().Get()).ToCStr().Get());
+#endif
             
             // Используем GUID созданной папки
             folderGuid = folder.guid;
+#ifdef DEBUG_UI_LOGS
             ACAPI_WriteReport("[LayerHelper] GUID созданной папки получен", false);
             ACAPI_WriteReport("[LayerHelper] Папка создана успешно, GUID не пустой: %s", false, 
                 (folderGuid != GS::Guid()) ? "да" : "нет");
+#endif
         } else {
             // Папка существует, используем её GUID
             folderGuid = existingFolder.guid;
+#ifdef DEBUG_UI_LOGS
             ACAPI_WriteReport("[LayerHelper] Папка уже существует: %s", false, 
                 GS::UniString::Printf("%s", currentPath[0].ToCStr().Get()).ToCStr().Get());
+#endif
         }
     }
 
@@ -128,12 +136,16 @@ bool CreateLayer(const GS::UniString& folderPath, const GS::UniString& layerName
     // Если имя слоя совпадает с именем папки, или слой с таким именем уже существует —
     // не создаём новый слой, а только переносим существующий в указанную папку
     if (!layerName.IsEmpty() && (layerName == folderPath)) {
+#ifdef DEBUG_UI_LOGS
         ACAPI_WriteReport("[LayerHelper] Имя слоя совпадает с именем папки: '%s' — пропускаем создание", false, layerName.ToCStr().Get());
+#endif
         API_AttributeIndex existingIdx = FindLayerByName(layerName);
         if (existingIdx.IsPositive()) {
             layerIndex = existingIdx;
             if (!folderPath.IsEmpty()) {
+#ifdef DEBUG_UI_LOGS
                 ACAPI_WriteReport("[LayerHelper] Переносим существующий слой '%s' в папку '%s'", false, layerName.ToCStr().Get(), folderPath.ToCStr().Get());
+#endif
                 MoveLayerToFolder(layerIndex, folderPath);
             }
             return true;
@@ -144,7 +156,9 @@ bool CreateLayer(const GS::UniString& folderPath, const GS::UniString& layerName
         // чтобы избежать ошибки создания дубликата
         API_AttributeIndex existingIdx = FindLayerByName(layerName);
         if (existingIdx.IsPositive()) {
+#ifdef DEBUG_UI_LOGS
             ACAPI_WriteReport("[LayerHelper] Слой '%s' уже существует — используем его и переносим при необходимости", false, layerName.ToCStr().Get());
+#endif
             layerIndex = existingIdx;
             if (!folderPath.IsEmpty()) {
                 MoveLayerToFolder(layerIndex, folderPath);
@@ -168,12 +182,16 @@ bool CreateLayer(const GS::UniString& folderPath, const GS::UniString& layerName
     layer.layer.conClassId = 1; // Класс соединения по умолчанию
 
     // Создаем слой в корне (папка будет назначена позже через MoveLayerToFolder)
+#ifdef DEBUG_UI_LOGS
     ACAPI_WriteReport("[LayerHelper] Создаем слой в корне", false);
+#endif
 
     // Создаем слой
     GSErrCode err = ACAPI_Attribute_Create(&layer, nullptr);
     if (err != NoError) {
+#ifdef DEBUG_UI_LOGS
         ACAPI_WriteReport("[LayerHelper] Ошибка создания слоя: %s", true, layerName.ToCStr().Get());
+#endif
         return false;
     }
 
@@ -181,13 +199,19 @@ bool CreateLayer(const GS::UniString& folderPath, const GS::UniString& layerName
     
     // Перемещаем слой в папку, если папка указана
     if (!folderPath.IsEmpty()) {
+#ifdef DEBUG_UI_LOGS
         ACAPI_WriteReport("[LayerHelper] Пытаемся переместить слой в папку: %s", false, folderPath.ToCStr().Get());
+#endif
         if (!MoveLayerToFolder(layerIndex, folderPath)) {
+#ifdef DEBUG_UI_LOGS
             ACAPI_WriteReport("[LayerHelper] Предупреждение: не удалось переместить слой в папку", false);
+#endif
         }
     }
     
+#ifdef DEBUG_UI_LOGS
     ACAPI_WriteReport("[LayerHelper] Создан слой: %s в папке: %s", false, layerName.ToCStr().Get(), folderPath.ToCStr().Get());
+#endif
     return true;
 }
 
@@ -201,11 +225,15 @@ bool MoveSelectedElementsToLayer(API_AttributeIndex layerIndex)
     BMKillHandle((GSHandle*)&selectionInfo.marquee.coords);
 
     if (selNeigs.IsEmpty()) {
+#ifdef DEBUG_UI_LOGS
         ACAPI_WriteReport("[LayerHelper] Нет выделенных элементов", false);
+#endif
         return false;
     }
 
+#ifdef DEBUG_UI_LOGS
     ACAPI_WriteReport("[LayerHelper] Перемещаем %d элементов в слой %s", false, (int)selNeigs.GetSize(), layerIndex.ToUniString().ToCStr().Get());
+#endif
 
     // Перемещаем каждый элемент
     for (const API_Neig& neig : selNeigs) {
@@ -214,7 +242,9 @@ bool MoveSelectedElementsToLayer(API_AttributeIndex layerIndex)
         
         GSErrCode err = ACAPI_Element_Get(&element);
         if (err != NoError) {
+#ifdef DEBUG_UI_LOGS
             ACAPI_WriteReport("[LayerHelper] Ошибка получения элемента: %s", true, APIGuidToString(neig.guid).ToCStr().Get());
+#endif
             continue;
         }
 
@@ -227,9 +257,13 @@ bool MoveSelectedElementsToLayer(API_AttributeIndex layerIndex)
 
         err = ACAPI_Element_Change(&element, &mask, nullptr, 0, true);
         if (err != NoError) {
+#ifdef DEBUG_UI_LOGS
             ACAPI_WriteReport("[LayerHelper] Ошибка изменения слоя элемента: %s", true, APIGuidToString(neig.guid).ToCStr().Get());
+#endif
         } else {
+#ifdef DEBUG_UI_LOGS
             ACAPI_WriteReport("[LayerHelper] Элемент перемещен в слой: %s", false, APIGuidToString(neig.guid).ToCStr().Get());
+#endif
         }
     }
 
@@ -248,7 +282,9 @@ bool ChangeSelectedElementsID(const GS::UniString& baseID)
 
     if (selNeigs.IsEmpty()) return false;
 
+#ifdef DEBUG_UI_LOGS
     ACAPI_WriteReport("[LayerHelper] Изменяем ID %d элементов с базовым названием: %s", false, (int)selNeigs.GetSize(), baseID.ToCStr().Get());
+#endif
 
     // Используем Undo-группу для возможности отмены
     GSErrCode err = ACAPI_CallUndoableCommand("Change Elements ID", [&]() -> GSErrCode {
@@ -261,10 +297,14 @@ bool ChangeSelectedElementsID(const GS::UniString& baseID)
 
             // Изменяем ID элемента
             if (ACAPI_Element_ChangeElementInfoString(&selNeigs[i].guid, &newID) != NoError) {
+#ifdef DEBUG_UI_LOGS
                 ACAPI_WriteReport("[LayerHelper] Ошибка изменения ID элемента: %s", true, APIGuidToString(selNeigs[i].guid).ToCStr().Get());
+#endif
                 continue;
             } else {
+#ifdef DEBUG_UI_LOGS
                 ACAPI_WriteReport("[LayerHelper] ID изменен: %s", false, newID.ToCStr().Get());
+#endif
             }
         }
         return NoError;
@@ -276,38 +316,60 @@ bool ChangeSelectedElementsID(const GS::UniString& baseID)
 // ---------------- Основная функция: создать папку, слой и переместить элементы ----------------
 bool CreateLayerAndMoveElements(const LayerCreationParams& params)
 {
+#ifdef DEBUG_UI_LOGS
     ACAPI_WriteReport("[LayerHelper] Начинаем создание папки, слоя и перемещение элементов", false);
     ACAPI_WriteReport("[LayerHelper] Папка: %s, Слой: %s, ID: %s", false, 
         params.folderPath.ToCStr().Get(), 
         params.layerName.ToCStr().Get(), 
         params.baseID.ToCStr().Get());
+#endif
 
     // Используем Undo-группу для возможности отмены всей операции
     GSErrCode err = ACAPI_CallUndoableCommand("Create Layer and Move Elements", [&]() -> GSErrCode {
         // 1. Создаем слой
         API_AttributeIndex layerIndex;
         if (!CreateLayer(params.folderPath, params.layerName, layerIndex)) {
+#ifdef DEBUG_UI_LOGS
             ACAPI_WriteReport("[LayerHelper] Ошибка создания слоя", true);
+#endif
             return APIERR_GENERAL;
         }
 
         // 2. Перемещаем элементы в новый слой
         if (!MoveSelectedElementsToLayer(layerIndex)) {
+#ifdef DEBUG_UI_LOGS
             ACAPI_WriteReport("[LayerHelper] Ошибка перемещения элементов", true);
+#endif
             return APIERR_GENERAL;
         }
 
         // 3. Изменяем ID элементов (только если baseID не пустой)
         if (!params.baseID.IsEmpty()) {
             if (!ChangeSelectedElementsID(params.baseID)) {
+#ifdef DEBUG_UI_LOGS
                 ACAPI_WriteReport("[LayerHelper] Ошибка изменения ID элементов", true);
+#endif
                 return APIERR_GENERAL;
             }
         } else {
+#ifdef DEBUG_UI_LOGS
             ACAPI_WriteReport("[LayerHelper] ID элементов не изменяются (baseID пустой)", false);
+#endif
         }
 
+        // 4. Скрываем слой, если требуется
+        if (params.hideLayer) {
+            if (!SetLayerVisibility(layerIndex, true)) {
+#ifdef DEBUG_UI_LOGS
+                ACAPI_WriteReport("[LayerHelper] Ошибка скрытия слоя", true);
+#endif
+                return APIERR_GENERAL;
+            }
+        }
+
+#ifdef DEBUG_UI_LOGS
         ACAPI_WriteReport("[LayerHelper] Операция завершена успешно", false);
+#endif
         return NoError;
     });
 
@@ -324,7 +386,9 @@ bool MoveLayerToFolder(API_AttributeIndex layerIndex, const GS::UniString& folde
     // Гарантируем существование папки и получаем её GUID
     GS::Guid folderGuid;
     if (!CreateLayerFolder(folderPath, folderGuid)) {
+#ifdef DEBUG_UI_LOGS
         ACAPI_WriteReport("[LayerHelper] Не удалось подготовить папку для слоя: %s", true, folderPath.ToCStr().Get());
+#endif
         return false;
     }
 
@@ -340,8 +404,10 @@ bool MoveLayerToFolder(API_AttributeIndex layerIndex, const GS::UniString& folde
     
     GSErrCode err = ACAPI_Attribute_Get(&layer);
     if (err != NoError) {
+#ifdef DEBUG_UI_LOGS
         ACAPI_WriteReport("[LayerHelper] Не удалось получить информацию о слое (код: %d)", true, err);
         ACAPI_WriteReport("[LayerHelper] Слой остался в корне, но папка создана: %s", false, folderPath.ToCStr().Get());
+#endif
         return true;
     }
     
@@ -353,7 +419,9 @@ bool MoveLayerToFolder(API_AttributeIndex layerIndex, const GS::UniString& folde
     
     err = ACAPI_Attribute_Get(&currentLayer);
     if (err != NoError) {
+#ifdef DEBUG_UI_LOGS
         ACAPI_WriteReport("[LayerHelper] Ошибка получения слоя для перемещения (код: %d)", true, err);
+#endif
         return false;
     }
     
@@ -373,22 +441,70 @@ bool MoveLayerToFolder(API_AttributeIndex layerIndex, const GS::UniString& folde
     targetFolder.guid = folderGuid;
     
     // Перемещаем слой в папку
+#ifdef DEBUG_UI_LOGS
     ACAPI_WriteReport("[LayerHelper] Вызываем ACAPI_Attribute_Move...", false);
+#endif
     err = ACAPI_Attribute_Move(foldersToMove, attributesToMove, targetFolder);
+#ifdef DEBUG_UI_LOGS
     ACAPI_WriteReport("[LayerHelper] ACAPI_Attribute_Move вернул код: %d", false, err);
+#endif
     
     if (err != NoError) {
+#ifdef DEBUG_UI_LOGS
         ACAPI_WriteReport("[LayerHelper] Ошибка перемещения слоя в папку '%s' (код: %d, hex: 0x%X)", true, 
             folderPath.ToCStr().Get(), err, (unsigned int)err);
         ACAPI_WriteReport("[LayerHelper] Слой остался в корне, но папка создана: %s", false, folderPath.ToCStr().Get());
+#endif
     } else {
+#ifdef DEBUG_UI_LOGS
         ACAPI_WriteReport("[LayerHelper] Слой успешно перемещен в папку: %s", false, folderPath.ToCStr().Get());
+#endif
     }
     
     return true;
 }
 
-
-
+// ---------------- Скрыть/показать слой ---------------- 
+bool SetLayerVisibility(API_AttributeIndex layerIndex, bool hidden)
+{
+#ifdef DEBUG_UI_LOGS
+    ACAPI_WriteReport("[LayerHelper] SetLayerVisibility: layer=%s, hidden=%s", false, 
+        layerIndex.ToUniString().ToCStr().Get(), hidden ? "true" : "false");
+#endif
+    
+    // Получаем текущий слой
+    API_Attribute layer = {};
+    layer.header.typeID = API_LayerID;
+    layer.header.index = layerIndex;
+    
+    GSErrCode err = ACAPI_Attribute_Get(&layer);
+    if (err != NoError) {
+#ifdef DEBUG_UI_LOGS
+        ACAPI_WriteReport("[LayerHelper] Ошибка получения слоя (код: %d)", true, err);
+#endif
+        return false;
+    }
+    
+    // Устанавливаем/снимаем флаг скрытия
+    if (hidden) {
+        layer.header.flags |= APILay_Hidden;  // Добавляем флаг скрытия
+    } else {
+        layer.header.flags &= ~APILay_Hidden; // Снимаем флаг скрытия
+    }
+    
+    // Сохраняем изменения через ACAPI_Attribute_Modify
+    err = ACAPI_Attribute_Modify(&layer, nullptr);
+    if (err != NoError) {
+#ifdef DEBUG_UI_LOGS
+        ACAPI_WriteReport("[LayerHelper] Ошибка установки видимости слоя (код: %d)", true, err);
+#endif
+        return false;
+    }
+    
+#ifdef DEBUG_UI_LOGS
+    ACAPI_WriteReport("[LayerHelper] Видимость слоя установлена: hidden=%s", false, hidden ? "true" : "false");
+#endif
+    return true;
+}
 
 } // namespace LayerHelper

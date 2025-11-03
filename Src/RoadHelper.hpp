@@ -36,6 +36,26 @@ namespace RoadHelper {
 	bool BuildPerpendicularPoints(const GS::Array<API_Coord>& centerPts, double halfWidthM, 
 	                             GS::Array<API_Coord>& leftPts, GS::Array<API_Coord>& rightPts);
 
+	// Перенесено из MeshHelper: создание Morph из точек (НЕ создает mesh!)
+	// thicknessMM: толщина Morph в мм (0 = плоский, только верхняя поверхность)
+	// materialTop, materialBottom, materialSide: индексы материалов для граней
+	bool CreateMorphFromPoints(const GS::Array<API_Coord3D>& points, double thicknessMM = 0.0,
+	                           API_AttributeIndex materialTop = ACAPI_CreateAttributeIndex(1),
+	                           API_AttributeIndex materialBottom = ACAPI_CreateAttributeIndex(2),
+	                           API_AttributeIndex materialSide = ACAPI_CreateAttributeIndex(3));
+	
+	// Вычисление площади верхней поверхности Morph и создание текстовой выноски
+	double CalculateMorphSurfaceArea(const GS::Array<API_Coord3D>& points);
+	bool CreateAreaLabel(const API_Coord& position, double areaM2);
+	
+	// Получить список всех доступных покрытий (материалы с текстурами) (для UI)
+	struct SurfaceFinishInfo {
+		Int32 index;  // числовой индекс материала/покрытия (1, 2, 3, ...)
+		GS::UniString name;
+	};
+	GS::Array<SurfaceFinishInfo> GetSurfaceFinishesList();
+	void InvalidateSurfaceFinishesCache(); // Сбросить кэш покрытий
+
 	// ------------------------------------------------------------------
 	// Внутренние структуры (чтобы .cpp мог работать понятно)
 	// ------------------------------------------------------------------
