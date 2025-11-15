@@ -128,13 +128,28 @@
     }
 
     async function landToMesh() {
+      const setSurface = ensureACAPI('SetGroundSurface');
+      const setObjects = ensureACAPI('SetGroundObjects');
       const applyOffset = ensureACAPI('ApplyGroundOffset');
-      if (!applyOffset) {
+      if (!setSurface || !setObjects || !applyOffset) {
         return;
       }
 
-      setInfo('Привязка выбранных объектов к сетке...');
+      setInfo('Проверка выделения...');
       try {
+        const surfaceOk = await setSurface();
+        if (!surfaceOk) {
+          setInfo('Не найдена выбранная 3D сетка. Выделите сетку и повторите.');
+          return;
+        }
+
+        const objectsOk = await setObjects();
+        if (!objectsOk) {
+          setInfo('Не найдены объекты для привязки. Добавьте объекты в выделение.');
+          return;
+        }
+
+        setInfo('Привязка выбранных объектов к сетке...');
         const ok = await applyOffset(0.0);
         setInfo(ok
           ? 'Привязка выполнена. Выбирайте одновременно 3D сетку и объекты, затем нажимайте «Привязать».'
