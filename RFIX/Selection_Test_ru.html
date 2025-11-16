@@ -1132,6 +1132,14 @@
         AddLog('[UI] OpenMeshPalette unavailable');
       }
     }
+    function openSendXlsPalette() {
+      if (ACAPI?.OpenSendXlsPalette) {
+        AddLog('[UI] OpenSendXlsPalette');
+        ACAPI.OpenSendXlsPalette();
+      } else {
+        AddLog('[UI] OpenSendXlsPalette unavailable');
+      }
+    }
     function openContourPalette() {
       if (ACAPI?.OpenContourPalette) {
         AddLog('[UI] OpenContourPalette');
@@ -1290,6 +1298,7 @@
     <button class="palette-button" onclick="openIdLayersPalette()">ID / Слои</button>
     <button class="palette-button" onclick="openContourPalette()">Контуры</button>
     <button class="palette-button" onclick="openMeshPalette()">Сетка</button>
+    <button class="palette-button" onclick="openSendXlsPalette()">Отправить в Excel</button>
   </div>
 </body>
 </html>

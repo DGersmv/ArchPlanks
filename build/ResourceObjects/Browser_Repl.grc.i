@@ -5,7 +5,7 @@
 
 'STR#' 32000 "Add-on Name and Description" {
 		"Landscape Helper AC27"
-		"Landscape AC27 V1.7"
+		"Landscape AC27 V2.0"
 }
 
 'STR#' 32501 "Strings for the Menu" {
@@ -113,4 +113,14 @@
 
 'DLGH'  32590  DLG_32590_Angle_Browser {
 1   "Angle Browser Control"     Browser_0
+}
+
+
+
+'GDLG'  32600    Palette | topCaption | close | grow   0   0  520  420  "Send to Excel"  {
+ Browser         0   0  520  420
+}
+
+'DLGH'  32600  DLG_32600_SendXls_Browser {
+1   "SendXls Browser Control"     Browser_0
 }

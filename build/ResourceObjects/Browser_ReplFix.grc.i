@@ -143,3 +143,7 @@
 'DATA' 180 "Angle Palette Html" {
 	"Angle_Palette.html"
 }
+
+'DATA' 190 "Send to Excel Palette Html" {
+	"Send_Xls_Palette.html"
+}

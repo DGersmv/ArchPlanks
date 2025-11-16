@@ -2,7 +2,7 @@
 <Project>
   <ProjectOutputs>
     <ProjectOutput>
-      <FullPath>D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\build\x64\Release\AddOnResources</FullPath>
+      <FullPath>C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\build\x64\Release\AddOnResources</FullPath>
     </ProjectOutput>
   </ProjectOutputs>
   <ContentFiles />

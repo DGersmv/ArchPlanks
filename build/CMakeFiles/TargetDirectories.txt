@@ -1,3 +1,3 @@
-D:/API Development Kit 27.6003/Examples/Browser_Repl_Int/build/CMakeFiles/AddOnResources.dir
-D:/API Development Kit 27.6003/Examples/Browser_Repl_Int/build/CMakeFiles/AddOn.dir
-D:/API Development Kit 27.6003/Examples/Browser_Repl_Int/build/CMakeFiles/ALL_BUILD.dir
+C:/Program Files/Graphisoft/API Development Kit 27.6003/Examples/Browser_Repl_Int/build/CMakeFiles/AddOnResources.dir
+C:/Program Files/Graphisoft/API Development Kit 27.6003/Examples/Browser_Repl_Int/build/CMakeFiles/AddOn.dir
+C:/Program Files/Graphisoft/API Development Kit 27.6003/Examples/Browser_Repl_Int/build/CMakeFiles/ALL_BUILD.dir

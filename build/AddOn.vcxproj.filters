@@ -1,171 +1,189 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\APICommon.c">
+    <ClCompile Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\APICommon.c">
       <Filter>Sources</Filter>
     </ClCompile>
-    <ClCompile Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\AnglePalette.cpp">
+    <ClCompile Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\AnglePalette.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
-    <ClCompile Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\BrowserRepl.cpp">
+    <ClCompile Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\BrowserRepl.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
-    <ClCompile Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\BuildHelper.cpp">
+    <ClCompile Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\BuildHelper.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
-    <ClCompile Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\ColumnOrientHelper.cpp">
+    <ClCompile Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\ColumnOrientHelper.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
-    <ClCompile Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\ContourPalette.cpp">
+    <ClCompile Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\ContourPalette.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
-    <ClCompile Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\DistributionPalette.cpp">
+    <ClCompile Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\DistributionPalette.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
-    <ClCompile Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\GDLHelper.cpp">
+    <ClCompile Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\GDLHelper.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
-    <ClCompile Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\GroundHelper.cpp">
+    <ClCompile Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\GroundHelper.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
-    <ClCompile Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\GroundPalette.cpp">
+    <ClCompile Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\GroundPalette.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
-    <ClCompile Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\HelpPalette.cpp">
+    <ClCompile Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\HelpPalette.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
-    <ClCompile Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\IdLayersPalette.cpp">
+    <ClCompile Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\IdLayersPalette.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
-    <ClCompile Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\LandscapeHelper.cpp">
+    <ClCompile Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\LandscapeHelper.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
-    <ClCompile Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\LayerHelper.cpp">
+    <ClCompile Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\LayerHelper.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
-    <ClCompile Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\Main.cpp">
+    <ClCompile Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\Main.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
-    <ClCompile Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\MarkupHelper.cpp">
+    <ClCompile Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\MarkupHelper.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
-    <ClCompile Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\MarkupPalette.cpp">
+    <ClCompile Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\MarkupPalette.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
-    <ClCompile Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\MeshIntersectionHelper.cpp">
+    <ClCompile Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\MeshIntersectionHelper.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
-    <ClCompile Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\MeshPalette.cpp">
+    <ClCompile Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\MeshPalette.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
-    <ClCompile Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\OrientationPalette.cpp">
+    <ClCompile Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\OrientationPalette.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
-    <ClCompile Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\PropertyUtils.cpp">
+    <ClCompile Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\PropertyUtils.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
-    <ClCompile Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\RoadHelper.cpp">
+    <ClCompile Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\RoadHelper.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
-    <ClCompile Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\RotateHelper.cpp">
+    <ClCompile Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\RotateHelper.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
-    <ClCompile Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\SelectionHelper.cpp">
+    <ClCompile Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\SelectionHelper.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
-    <ClCompile Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\ShellHelper.cpp">
+    <ClCompile Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\SelectionMetricsHelper.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
-    <ClCompile Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\UserItemDialog.cpp">
+    <ClCompile Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\SelectionPropertyHelper.cpp">
+      <Filter>Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\SendXlsPalette.cpp">
+      <Filter>Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\ShellHelper.cpp">
+      <Filter>Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\UserItemDialog.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\APICommon.h">
+    <ClInclude Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\APICommon.h">
       <Filter>Sources</Filter>
     </ClInclude>
-    <ClInclude Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\APIEnvir.h">
+    <ClInclude Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\APIEnvir.h">
       <Filter>Sources</Filter>
     </ClInclude>
-    <ClInclude Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\AnglePalette.hpp">
+    <ClInclude Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\AnglePalette.hpp">
       <Filter>Sources</Filter>
     </ClInclude>
-    <ClInclude Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\BrowserRepl.hpp">
+    <ClInclude Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\BrowserRepl.hpp">
       <Filter>Sources</Filter>
     </ClInclude>
-    <ClInclude Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\BuildHelper.hpp">
+    <ClInclude Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\BuildHelper.hpp">
       <Filter>Sources</Filter>
     </ClInclude>
-    <ClInclude Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\ColumnOrientHelper.hpp">
+    <ClInclude Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\ColumnOrientHelper.hpp">
       <Filter>Sources</Filter>
     </ClInclude>
-    <ClInclude Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\ContourPalette.hpp">
+    <ClInclude Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\ContourPalette.hpp">
       <Filter>Sources</Filter>
     </ClInclude>
-    <ClInclude Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\DistributionPalette.hpp">
+    <ClInclude Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\DistributionPalette.hpp">
       <Filter>Sources</Filter>
     </ClInclude>
-    <ClInclude Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\GDLHelper.hpp">
+    <ClInclude Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\GDLHelper.hpp">
       <Filter>Sources</Filter>
     </ClInclude>
-    <ClInclude Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\GroundHelper.hpp">
+    <ClInclude Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\GroundHelper.hpp">
       <Filter>Sources</Filter>
     </ClInclude>
-    <ClInclude Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\GroundPalette.hpp">
+    <ClInclude Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\GroundPalette.hpp">
       <Filter>Sources</Filter>
     </ClInclude>
-    <ClInclude Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\HelpPalette.hpp">
+    <ClInclude Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\HelpPalette.hpp">
       <Filter>Sources</Filter>
     </ClInclude>
-    <ClInclude Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\IdLayersPalette.hpp">
+    <ClInclude Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\IdLayersPalette.hpp">
       <Filter>Sources</Filter>
     </ClInclude>
-    <ClInclude Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\LandscapeHelper.hpp">
+    <ClInclude Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\LandscapeHelper.hpp">
       <Filter>Sources</Filter>
     </ClInclude>
-    <ClInclude Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\LayerHelper.hpp">
+    <ClInclude Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\LayerHelper.hpp">
       <Filter>Sources</Filter>
     </ClInclude>
-    <ClInclude Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\MarkupHelper.hpp">
+    <ClInclude Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\MarkupHelper.hpp">
       <Filter>Sources</Filter>
     </ClInclude>
-    <ClInclude Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\MarkupPalette.hpp">
+    <ClInclude Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\MarkupPalette.hpp">
       <Filter>Sources</Filter>
     </ClInclude>
-    <ClInclude Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\MeshIntersectionHelper.hpp">
+    <ClInclude Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\MeshIntersectionHelper.hpp">
       <Filter>Sources</Filter>
     </ClInclude>
-    <ClInclude Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\MeshPalette.hpp">
+    <ClInclude Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\MeshPalette.hpp">
       <Filter>Sources</Filter>
     </ClInclude>
-    <ClInclude Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\OrientationPalette.hpp">
+    <ClInclude Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\OrientationPalette.hpp">
       <Filter>Sources</Filter>
     </ClInclude>
-    <ClInclude Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\PropertyUtils.hpp">
+    <ClInclude Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\PropertyUtils.hpp">
       <Filter>Sources</Filter>
     </ClInclude>
-    <ClInclude Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\ResourceIDs.hpp">
+    <ClInclude Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\ResourceIDs.hpp">
       <Filter>Sources</Filter>
     </ClInclude>
-    <ClInclude Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\RoadHelper.hpp">
+    <ClInclude Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\RoadHelper.hpp">
       <Filter>Sources</Filter>
     </ClInclude>
-    <ClInclude Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\RotateHelper.hpp">
+    <ClInclude Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\RotateHelper.hpp">
       <Filter>Sources</Filter>
     </ClInclude>
-    <ClInclude Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\SelectionHelper.hpp">
+    <ClInclude Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\SelectionHelper.hpp">
       <Filter>Sources</Filter>
     </ClInclude>
-    <ClInclude Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\ShellHelper.hpp">
+    <ClInclude Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\SelectionMetricsHelper.hpp">
       <Filter>Sources</Filter>
     </ClInclude>
-    <ClInclude Include="D:\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\UserItemDialog.hpp">
+    <ClInclude Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\SelectionPropertyHelper.hpp">
+      <Filter>Sources</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\SendXlsPalette.hpp">
+      <Filter>Sources</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\ShellHelper.hpp">
+      <Filter>Sources</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Program Files\Graphisoft\API Development Kit 27.6003\Examples\Browser_Repl_Int\Src\UserItemDialog.hpp">
       <Filter>Sources</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Sources">
-      <UniqueIdentifier>{2FF66A04-7E47-37AC-A923-6978FFA235AD}</UniqueIdentifier>
+      <UniqueIdentifier>{89AF12E7-ABAF-3A7D-89EA-C40BA4F4839E}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

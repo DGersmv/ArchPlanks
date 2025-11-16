@@ -20,6 +20,7 @@
 #include    "MeshPalette.hpp"
 #include    "IdLayersPalette.hpp"
 #include    "AnglePalette.hpp"
+#include    "SendXlsPalette.hpp"
 
 // -----------------------------------------------------------------------------
 // Show or Hide Browser Palette
@@ -119,6 +120,7 @@ GSErrCode __ACENV_CALL Initialize ()
     palErr |= MeshPalette::RegisterPaletteControlCallBack ();
     palErr |= IdLayersPalette::RegisterPaletteControlCallBack ();
     palErr |= AnglePalette::RegisterPaletteControlCallBack ();
+	palErr |= SendXlsPalette::RegisterPaletteControlCallBack ();
 
     if (DBERROR (palErr != NoError))
         return palErr;

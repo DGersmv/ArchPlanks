@@ -41,4 +41,8 @@ constexpr short AnglePaletteResId = 32590;
 constexpr short AngleBrowserCtrlId = 1;
 constexpr short AngleHtmlResId = 180;
 
+constexpr short SendXlsPaletteResId = 32600;
+constexpr short SendXlsBrowserCtrlId = 1;
+constexpr short SendXlsHtmlResId = 190;
+
 #endif

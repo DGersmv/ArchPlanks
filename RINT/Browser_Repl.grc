@@ -4,7 +4,7 @@
 
 'STR#' 32000 "Add-on Name and Description" {
 /* [  1] */		"Landscape Helper AC27"
-/* [  2] */		"Landscape AC27 V1.7"
+/* [  2] */		"Landscape AC27 V2.0"
 }
 
 'STR#' 32501 "Strings for the Menu" {
@@ -112,4 +112,14 @@
 
 'DLGH'  32590  DLG_32590_Angle_Browser {
 1   "Angle Browser Control"     Browser_0
+}
+
+/* --- Dockable browser palette: SEND TO EXCEL ---------------------------------------*/
+
+'GDLG'  32600    Palette | topCaption | close | grow   0   0  520  420  "Send to Excel"  {
+/* [  1] */ Browser         0   0  520  420
+}
+
+'DLGH'  32600  DLG_32600_SendXls_Browser {
+1   "SendXls Browser Control"     Browser_0
 }
