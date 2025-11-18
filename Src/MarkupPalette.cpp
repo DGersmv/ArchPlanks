@@ -173,3 +173,5 @@ void MarkupPalette::PanelCloseRequested(const DG::PanelCloseRequestEvent&, bool*
 
 
 
+
+

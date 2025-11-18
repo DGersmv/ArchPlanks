@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Landscape Helper — Выбранные элементы</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #efefef;
+      margin: 0;
+      color: #2f2f2f;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 12px 0;
+    }
+    .palette {
+      width: 340px;
+      background: #efefef;
+      border: 1px solid #a6a3a0;
+      box-shadow: inset 0 0 0 1px #f8f8f8;
+      padding: 12px;
+      box-sizing: border-box;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+    h1 {
+      font-size: 13px;
+      font-weight: 600;
+      margin: 0 0 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .section {
+      margin-bottom: 12px;
+    }
+    .section-title {
+      font-weight: 600;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      font-size: 11px;
+      color: #54524f;
+    }
+    .selection-table-container {
+      background: transparent;
+    }
+    table.selection-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #ffffff;
+      font-size: 11px;
+      box-shadow: inset 0 0 0 1px #d2cec9;
+    }
+    table.selection-table thead th {
+      text-align: left;
+      background: #dcd9d4;
+      border: 1px solid #b6b2ae;
+      padding: 4px 6px;
+      font-weight: 600;
+    }
+    table.selection-table tbody td {
+      border: 1px solid #c8c4c0;
+      padding: 4px 6px;
+    }
+    table.selection-table tbody tr:hover td {
+      background: #f3f1ee;
+    }
+    table.selection-table th:first-child,
+    table.selection-table td:first-child {
+      width: 32px;
+      text-align: center;
+    }
+    table.selection-table thead,
+    table.selection-table tbody {
+      display: block;
+    }
+    table.selection-table thead tr,
+    table.selection-table tbody tr {
+      display: table;
+      width: 100%;
+      table-layout: fixed;
+    }
+    table.selection-table tbody {
+      max-height: 300px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      border-left: 1px solid #c8c4c0;
+      border-right: 1px solid #c8c4c0;
+      border-bottom: 1px solid #c8c4c0;
+    }
+    table.selection-table td.count-cell {
+      cursor: pointer;
+    }
+    .button-flat {
+      display: inline-block;
+      padding: 4px 10px;
+      border: 1px solid #a8a5a2;
+      border-radius: 2px;
+      background: #dcd9d4;
+      color: #2f2f2f;
+      font-size: 12px;
+      cursor: pointer;
+      box-shadow: inset 0 1px 0 #f5f4f2;
+      min-width: 70px;
+      text-align: center;
+    }
+    .button-flat:hover {
+      background: #e7e4de;
+    }
+    .button-flat:active {
+      background: #cac7c2;
+    }
+    .button-flat:disabled {
+      background: #e2e0de;
+      color: #8a8a8a;
+      cursor: default;
+    }
+    .button-primary {
+      font-weight: 600;
+    }
+    .controls-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .info-box {
+      margin-top: 8px;
+      padding: 6px;
+      border: 1px solid #c0beb9;
+      background: #f9f8f6;
+      min-height: 32px;
+      font-size: 11px;
+      white-space: pre-wrap;
+    }
+    input[type="checkbox"] {
+      margin-right: 4px;
+    }
+    .help-button {
+      font-size: 11px;
+      padding: 4px 8px;
+      min-width: auto;
+    }
+    #selection-ok-btn {
+      margin-left: auto;
+    }
+  </style>
+
+  <script type="text/javascript">
+    "use strict";
+
+    // ================= helpers =================
+    function setInfo(id, msg) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = msg;
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // =============== selection table ===============
+    // Модель данных: groupKey -> Array<GUID>
+    let groupDataMap = {}; // groupKey -> { guids: Array<GUID>, type, id, layer, count }
+    let selectedGuids = new Set(); // Set<GUID> - актуальные выбранные GUID
+
+    function UpdateSelectedElements() {
+      const A = window.ACAPI;
+      if (!A || typeof A.GetSelectedElements !== 'function') {
+        return;
+      }
+      A.GetSelectedElements().then(function (elemInfos) {
+        const selectionTable = document.getElementById('selection');
+        
+        // Формируем структуру groupKey -> Array<GUID>
+        groupDataMap = {};
+        if (elemInfos && elemInfos.length > 0) {
+          for (let i = 0; i < elemInfos.length; i++) {
+            const guidStr   = elemInfos[i][0];
+            const typeName  = elemInfos[i][1];
+            const elemID    = elemInfos[i][2];
+            const layerName = elemInfos[i][3] || 'Unknown';
+            
+            const groupKey = typeName + "||" + elemID + "||" + layerName;
+            if (!groupDataMap[groupKey]) {
+              groupDataMap[groupKey] = {
+                guids: [],
+                type: typeName,
+                id: elemID,
+                layer: layerName,
+                count: 0
+              };
+            }
+            groupDataMap[groupKey].guids.push(guidStr);
+            groupDataMap[groupKey].count++;
+          }
+        }
+        
+        // Оптимизация: формируем весь HTML за раз
+        let html = '';
+        if (Object.keys(groupDataMap).length === 0) {
+          html = '<tr><td colspan="5">Нет выбранных элементов</td></tr>';
+        } else {
+          // Проверяем состояние чекбоксов для обновления selectedGuids
+          // Сохраняем текущее состояние чекбоксов перед перерисовкой
+          const checkedGroups = new Set();
+          const checkboxes = selectionTable.querySelectorAll('input[type="checkbox"][data-group]');
+          checkboxes.forEach(cb => {
+            if (cb.checked) {
+              checkedGroups.add(cb.getAttribute('data-group'));
+            }
+          });
+          
+          // Если selectedGuids пуст и нет отмеченных чекбоксов - это первый запуск, отмечаем все
+          const isFirstRun = selectedGuids.size === 0 && checkedGroups.size === 0;
+          
+          if (isFirstRun) {
+            // При первом запуске все группы отмечены (все элементы уже выделены в Archicad)
+            Object.keys(groupDataMap).forEach(groupKey => {
+              const group = groupDataMap[groupKey];
+              group.guids.forEach(guid => selectedGuids.add(guid));
+            });
+          } else {
+            // Обновляем selectedGuids на основе отмеченных групп
+            selectedGuids.clear();
+            checkedGroups.forEach(groupKey => {
+              if (groupDataMap[groupKey]) {
+                groupDataMap[groupKey].guids.forEach(guid => selectedGuids.add(guid));
+              }
+            });
+          }
+          
+          // Формируем HTML строк
+          for (const groupKey of Object.keys(groupDataMap)) {
+            const group = groupDataMap[groupKey];
+            const isChecked = group.guids.every(guid => selectedGuids.has(guid));
+            html += '<tr data-group="' + escapeHtml(groupKey) + '">' +
+              '<td><input type="checkbox" data-group="' + escapeHtml(groupKey) + '" ' + (isChecked ? 'checked' : '') + ' onchange="handleRowCheckboxChange(this)"></td>' +
+              '<td>' + escapeHtml(group.type) + '</td>' +
+              '<td>' + escapeHtml(group.id) + '</td>' +
+              '<td>' + escapeHtml(group.layer) + '</td>' +
+              '<td class="count-cell" onclick="toggleRowCheckbox(\'' + escapeHtml(groupKey) + '\')">' + group.count + '</td>' +
+              '</tr>';
+          }
+        }
+        
+        // Одна операция DOM вместо множества
+        selectionTable.innerHTML = html;
+        
+        // Обновляем состояние чекбокса "выбрать всё"
+        updateSelectAllCheckbox();
+      }).catch(err => console.log('[UI] GetSelectedElements error: ' + err));
+    }
+
+    function toggleRowCheckbox(groupKey) {
+      const checkbox = document.querySelector('input[type="checkbox"][data-group="' + escapeHtml(groupKey) + '"]');
+      if (checkbox) {
+        checkbox.checked = !checkbox.checked;
+        handleRowCheckboxChange(checkbox);
+      }
+    }
+
+    function handleRowCheckboxChange(checkbox) {
+      const groupKey = checkbox.getAttribute('data-group');
+      if (!groupKey || !groupDataMap[groupKey]) return;
+      
+      const group = groupDataMap[groupKey];
+      if (checkbox.checked) {
+        // Добавляем все GUID этой группы
+        group.guids.forEach(guid => selectedGuids.add(guid));
+      } else {
+        // Удаляем все GUID этой группы
+        group.guids.forEach(guid => selectedGuids.delete(guid));
+      }
+      
+      updateSelectAllCheckbox();
+    }
+
+    function updateSelectAllCheckbox() {
+      const selectAllCheckbox = document.getElementById('select-all-checkbox');
+      if (!selectAllCheckbox) return;
+      
+      const visibleGroups = Object.keys(groupDataMap);
+      if (visibleGroups.length === 0) {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = false;
+        return;
+      }
+      
+      let checkedCount = 0;
+      visibleGroups.forEach(groupKey => {
+        const group = groupDataMap[groupKey];
+        if (group.guids.every(guid => selectedGuids.has(guid))) {
+          checkedCount++;
+        }
+      });
+      
+      if (checkedCount === 0) {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = false;
+      } else if (checkedCount === visibleGroups.length) {
+        selectAllCheckbox.checked = true;
+        selectAllCheckbox.indeterminate = false;
+      } else {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = true;
+      }
+    }
+
+    function handleSelectAllCheckboxChange() {
+      const selectAllCheckbox = document.getElementById('select-all-checkbox');
+      if (!selectAllCheckbox) return;
+      
+      const visibleGroups = Object.keys(groupDataMap);
+      const isChecked = selectAllCheckbox.checked;
+      
+      visibleGroups.forEach(groupKey => {
+        const group = groupDataMap[groupKey];
+        const checkbox = document.querySelector('input[type="checkbox"][data-group="' + escapeHtml(groupKey) + '"]');
+        
+        if (isChecked) {
+          // Добавляем все GUID всех групп
+          group.guids.forEach(guid => selectedGuids.add(guid));
+          if (checkbox) checkbox.checked = true;
+        } else {
+          // Удаляем все GUID всех групп
+          group.guids.forEach(guid => selectedGuids.delete(guid));
+          if (checkbox) checkbox.checked = false;
+        }
+      });
+      
+      selectAllCheckbox.indeterminate = false;
+    }
+
+    function applyCheckedSelection() {
+      const A = window.ACAPI;
+      if (!A || typeof A.ApplyCheckedSelection !== 'function') {
+        return;
+      }
+      
+      const guidsArray = Array.from(selectedGuids);
+      if (guidsArray.length === 0) {
+        setInfo("selection-info", "Не выбрано ни одной группы");
+        return;
+      }
+      
+      A.ApplyCheckedSelection(guidsArray).then(function(result) {
+        if (result && typeof result === 'object') {
+          const applied = result.applied || 0;
+          const requested = result.requested || guidsArray.length;
+          setInfo("selection-info", "Выделение применено: " + applied + " из " + requested + " элементов");
+          
+          // Опционально: обновляем таблицу после применения
+          setTimeout(UpdateSelectedElements, 500);
+        } else {
+          setInfo("selection-info", "Выделение применено");
+          setTimeout(UpdateSelectedElements, 500);
+        }
+      }).catch(function(err) {
+        setInfo("selection-info", "Ошибка: " + err);
+      });
+    }
+
+    // =============== ACAPI bridge waiting ===============
+    function whenACAPIReadyDo(cb) {
+      let fired = false;
+      const probe = () => {
+        const A = window.ACAPI;
+        if (!A) return null;
+        return {
+          hasSelect : typeof A.GetSelectedElements === 'function'
+        };
+      };
+      const ready = () => {
+        const caps = probe();
+        return caps && caps.hasSelect;
+      };
+      const fire = () => {
+        if (fired) return;
+        fired = true;
+        try {
+          cb();
+        } catch (e) { console.log('[UI] callback error: ' + e); }
+      };
+
+      if (ready()) { fire(); return; }
+
+      let tries = 0;
+      const maxTries = 120;
+      const iv = setInterval(() => {
+        if (ready()) {
+          clearInterval(iv);
+          fire();
+        } else if (++tries > maxTries) {
+          clearInterval(iv);
+        }
+      }, 50);
+    }
+
+    // Инициализация при загрузке
+    whenACAPIReadyDo(function() {
+      UpdateSelectedElements();
+    });
+
+    // Обработчик для кнопки справки
+    document.addEventListener('DOMContentLoaded', function() {
+      const helpButton = document.querySelector('.help-button');
+      if (helpButton) {
+        helpButton.addEventListener('click', function() {
+          const url = this.getAttribute('data-help-url');
+          if (url && window.ACAPI && window.ACAPI.OpenHelpURL) {
+            window.ACAPI.OpenHelpURL(url);
+          }
+        });
+      }
+    });
+  </script>
+</head>
+
+<body>
+<div class="palette">
+  <h1>Выбранные элементы</h1>
+
+  <div class="section">
+    <div class="section-title">Текущий набор</div>
+    <div class="selection-table-container">
+      <table class="selection-table">
+        <thead>
+          <tr>
+            <th colspan="5">Выбранные элементы</th>
+          </tr>
+          <tr>
+            <th><input type="checkbox" id="select-all-checkbox" title="Выбрать/снять всё" onchange="handleSelectAllCheckboxChange()"></th>
+            <th>Тип</th>
+            <th>ID</th>
+            <th>Слой</th>
+            <th>Кол-во</th>
+          </tr>
+        </thead>
+        <tbody id="selection"><tr><td colspan="5">Нет выбранных элементов</td></tr></tbody>
+      </table>
+      <div id="selection-info" class="info-box">Отметьте группы чекбоксами и нажмите OK, чтобы оставить в выделении только выбранные группы.</div>
+      <div class="controls-row">
+        <button class="button-flat help-button" data-help-url="https://landscape.227.info/help/selection">Справка</button>
+        <button id="selection-ok-btn" class="button-flat button-primary" onclick="applyCheckedSelection()">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
+
+

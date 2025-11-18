@@ -6,11 +6,15 @@
 #include "ACAPinc.h"
 #include "ResourceIDs.hpp"
 #include "DGDefs.h"
-#include "DGBrowser.hpp"
 
+// Forward declaration for JavaScript API registration (used by other palettes)
+namespace DG { class Browser; }
 
-// Класс BrowserRepl управляет палитрой и встроенным браузером
-class BrowserRepl : public DG::Palette, public DG::PanelObserver {
+// Класс BrowserRepl управляет палитрой с нативными кнопками
+class BrowserRepl : public DG::Palette, 
+                    public DG::PanelObserver,
+                    public DG::ButtonItemObserver,
+                    public DG::CompoundItemObserver {
 public:
     BrowserRepl();
     ~BrowserRepl();
@@ -22,23 +26,34 @@ public:
 
     void Show();
     void Hide();
-    void InitBrowserControl();
 
-    void UpdateSelectedElementsOnHTML();
-    static GSErrCode __ACENV_CALL SelectionChangeHandler(const API_Neig*);
     static GSErrCode __ACENV_CALL PaletteControlCallBack(Int32 referenceID, API_PaletteMessageID messageID, GS::IntPtr param);
-
     static GSErrCode RegisterPaletteControlCallBack();
+    
+    // JavaScript API registration - still needed for other palettes
     static void RegisterACAPIJavaScriptObject(DG::Browser& targetBrowser);
-
-    // --- Новый публичный метод для логов ---
-    void LogToBrowser(const GS::UniString& msg);
 
 private:
     static GS::Ref<BrowserRepl> instance;
-    DG::Browser browser;   // приватный браузер
+    
+    // Native icon buttons
+    DG::IconButton buttonClose;
+    DG::IconButton buttonTable;
+    DG::IconButton buttonSpline;
+    DG::IconButton buttonRotate;
+    DG::IconButton buttonRotSurf;
+    DG::IconButton buttonLand;
+    DG::IconButton buttonDims;
+    DG::IconButton buttonLayers;
+    DG::IconButton buttonContour;
+    DG::IconButton buttonMesh;
+    DG::IconButton buttonCSV;
+    DG::IconButton buttonSupport;
 
     void SetMenuItemCheckedState(bool isChecked);
+    
+    // Button click handlers
+    void ButtonClicked(const DG::ButtonClickEvent& ev) override;
 
     // DG overrides
     void PanelResized(const DG::PanelResizeEvent& ev) override;

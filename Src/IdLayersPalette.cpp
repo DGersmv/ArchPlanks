@@ -175,3 +175,5 @@ void IdLayersPalette::PanelCloseRequested(const DG::PanelCloseRequestEvent&, boo
 
 
 
+
+

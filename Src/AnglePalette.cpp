@@ -174,3 +174,5 @@ void AnglePalette::PanelCloseRequested(const DG::PanelCloseRequestEvent&, bool* 
 
 
 
+
+

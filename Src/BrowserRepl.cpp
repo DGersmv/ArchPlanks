@@ -1,9 +1,7 @@
 ﻿#include "ACAPinc.h"
 #include "APICommon.h"
-
-
-
 #include "BrowserRepl.hpp"
+#include "DGBrowser.hpp"
 
 #include <Windows.h>
 #include "SelectionHelper.hpp"
@@ -29,6 +27,7 @@
 #include "SelectionPropertyHelper.hpp"
 #include "SelectionMetricsHelper.hpp"
 #include "SendXlsPalette.hpp"
+#include "SelectionDetailsPalette.hpp"
 
 
 
@@ -40,30 +39,7 @@
 static const GS::Guid paletteGuid("{11bd981d-f772-4a57-8709-42e18733a0cc}");
 GS::Ref<BrowserRepl> BrowserRepl::instance;
 
-// --------------------- Helpers (resource, js parsing, logging) ---------------------
-static GS::UniString LoadHtmlFromResource()
-{
-	GS::UniString resourceData;
-	GSHandle data = RSLoadResource('DATA', ACAPI_GetOwnResModule(), 100);
-	if (data != nullptr) {
-		const GSSize handleSize = BMhGetSize(data);
-		resourceData.Append(*data, handleSize);
-		BMhKill(&data);
-		if (BrowserRepl::HasInstance())
-			BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[UI] HTML resource loaded, size=%u bytes", (unsigned)handleSize));
-#ifdef DEBUG_UI_LOGS
-		ACAPI_WriteReport("[BrowserRepl] HTML resource loaded, size=%u bytes", false, (unsigned)handleSize);
-#endif
-	}
-	else {
-		if (BrowserRepl::HasInstance())
-			BrowserRepl::GetInstance().LogToBrowser("[UI] ERROR: HTML resource not found (DATA 100)");
-#ifdef DEBUG_UI_LOGS
-		ACAPI_WriteReport("[BrowserRepl] ERROR: HTML resource not found (DATA 100)", false);
-#endif
-	}
-	return resourceData;
-}
+// HTML/JavaScript helpers removed - using native buttons now
 
 // --- Extract double from JS::Base (supports 123 / "123.4" / "123,4") ---
 // Общий хелпер: вытащить double из JS::Base (поддерживает number, string "3,5"/"3.5", bool)
@@ -232,22 +208,27 @@ static GSErrCode __ACENV_CALL NotificationHandler(API_NotifyEventID notifID, Int
 // --------------------- BrowserRepl impl ---------------------
 BrowserRepl::BrowserRepl() :
 	DG::Palette(ACAPI_GetOwnResModule(), BrowserReplResId, ACAPI_GetOwnResModule(), paletteGuid),
-	browser(GetReference(), BrowserId)
+	buttonClose(GetReference(), ToolbarButtonCloseId),
+	buttonTable(GetReference(), ToolbarButtonTableId),
+	buttonSpline(GetReference(), ToolbarButtonSplineId),
+	buttonRotate(GetReference(), ToolbarButtonRotateId),
+	buttonRotSurf(GetReference(), ToolbarButtonRotSurfId),
+	buttonLand(GetReference(), ToolbarButtonLandId),
+	buttonDims(GetReference(), ToolbarButtonDimsId),
+	buttonLayers(GetReference(), ToolbarButtonLayersId),
+	buttonContour(GetReference(), ToolbarButtonContourId),
+	buttonMesh(GetReference(), ToolbarButtonMeshId),
+	buttonCSV(GetReference(), ToolbarButtonCSVId),
+	buttonSupport(GetReference(), ToolbarButtonSupportId)
 {
 #ifdef DEBUG_UI_LOGS
-	ACAPI_WriteReport("[BrowserRepl] ctor", false);
+	ACAPI_WriteReport("[BrowserRepl] ctor with native buttons", false);
 #endif
 	ACAPI_ProjectOperation_CatchProjectEvent(APINotify_Quit, NotificationHandler);
 
-	// Подпишемся на изменение выделения (чтобы UI таблица актуализировалась)
-	const GSErr selErr = ACAPI_Notification_CatchSelectionChange(SelectionChangeHandler);
-#ifdef DEBUG_UI_LOGS
-	ACAPI_WriteReport("[BrowserRepl] CatchSelectionChange then err=%d", false, (int)selErr);
-#endif
-
 	Attach(*this);
+	AttachToAllItems(*this);
 	BeginEventProcessing();
-	InitBrowserControl();
 }
 
 BrowserRepl::~BrowserRepl()
@@ -296,43 +277,10 @@ void BrowserRepl::Hide()
 	SetMenuItemCheckedState(false);
 }
 
-void BrowserRepl::InitBrowserControl()
-{
-#ifdef DEBUG_UI_LOGS
-	ACAPI_WriteReport("[BrowserRepl] InitBrowserControl: loading HTML", false);
-#endif
-	browser.LoadHTML(LoadHtmlFromResource());
-	RegisterACAPIJavaScriptObject(browser);
-	// Страница сама дернёт UpdateSelectedElements() через whenACAPIReadyDo
-	LogToBrowser("[C++] BrowserRepl initialized");
-	
-#ifndef DEBUG_UI_LOGS
-	// В Release прячем чёрное поле логов (в HTML оно уже скрыто по умолчанию, но на всякий случай)
-	browser.ExecuteJS("var logBox = document.getElementById('log-box'); if (logBox) logBox.style.display = 'none';");
-#else
-	// В Debug показываем поле логов (в HTML оно скрыто по умолчанию)
-	browser.ExecuteJS("var logBox = document.getElementById('log-box'); if (logBox) logBox.style.display = 'block';");
-#endif
-}
+// Browser-related methods removed - using native buttons now
 
-void BrowserRepl::LogToBrowser(const GS::UniString& msg)
-{
-#ifdef DEBUG_UI_LOGS
-	// UniString → UTF-8
-	std::string utf8(msg.ToCStr(CC_UTF8));
-	GS::UniString jsSafe(utf8.c_str(), CC_UTF8);
-
-	// Экранируем спецсимволы для JS-строки
-	jsSafe.ReplaceAll("\\", "\\\\");
-	jsSafe.ReplaceAll("\"", "\\\"");
-	jsSafe.ReplaceAll("\r", "");
-	jsSafe.ReplaceAll("\n", "\\n");
-
-	browser.ExecuteJS("AddLog(\"" + jsSafe + "\");");
-#endif
-}
-
-// ------------------ JS API registration ---------------------
+// JavaScript API registration - still needed for other palettes (DistributionPalette, etc.)
+// but not used by the main toolbar anymore
 void BrowserRepl::RegisterACAPIJavaScriptObject(DG::Browser& targetBrowser)
 {
 #ifdef DEBUG_UI_LOGS
@@ -372,16 +320,16 @@ void BrowserRepl::RegisterACAPIJavaScriptObject(DG::Browser& targetBrowser)
 
 	jsACAPI->AddItem(new JS::Function("ChangeSelectedElementsID", [](GS::Ref<JS::Base> param) {
 		const GS::UniString baseID = GetStringFromJavaScriptVariable(param);
-		if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] ChangeSelectedElementsID " + baseID);
+		// if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] ChangeSelectedElementsID " + baseID);
 		const bool success = SelectionHelper::ChangeSelectedElementsID(baseID);
 		return ConvertToJavaScriptVariable(success);
 		}));
 
 	jsACAPI->AddItem(new JS::Function("ApplyCheckedSelection", [](GS::Ref<JS::Base> param) {
 		GS::Array<GS::UniString> guidStrings = GetStringArrayFromJavaScriptVariable(param);
-		if (BrowserRepl::HasInstance()) {
-			BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] ApplyCheckedSelection: %d GUIDs", (int)guidStrings.GetSize()));
-		}
+		// if (BrowserRepl::HasInstance()) {
+		//	BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] ApplyCheckedSelection: %d GUIDs", (int)guidStrings.GetSize()));
+		// }
 		
 		GS::Array<API_Guid> guids;
 		for (UIndex i = 0; i < guidStrings.GetSize(); ++i) {
@@ -494,15 +442,15 @@ void BrowserRepl::RegisterACAPIJavaScriptObject(DG::Browser& targetBrowser)
 		}));
 
 	jsACAPI->AddItem(new JS::Function("CreateLayerAndMoveElements", [](GS::Ref<JS::Base> param) {
-		if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] CreateLayerAndMoveElements");
+		// if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] CreateLayerAndMoveElements");
 		
 		// Парсим параметры из JavaScript строки (передаем как JSON строку)
 		LayerHelper::LayerCreationParams params;
 		
 		GS::UniString jsonStr = GetStringFromJavaScriptVariable(param);
-		if (BrowserRepl::HasInstance()) {
-			BrowserRepl::GetInstance().LogToBrowser("[C++] JSON строка: " + jsonStr);
-		}
+		// if (BrowserRepl::HasInstance()) {
+		//	BrowserRepl::GetInstance().LogToBrowser("[C++] JSON строка: " + jsonStr);
+		// }
 		
 		// Простой парсинг JSON (папка|слой)
 		GS::Array<GS::UniString> parts;
@@ -522,13 +470,13 @@ void BrowserRepl::RegisterACAPIJavaScriptObject(DG::Browser& targetBrowser)
 			}
 		}
 		
-		if (BrowserRepl::HasInstance()) {
-			BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[C++] Создание слоя: папка='%s', слой='%s', ID='%s', hide=%s", 
-				params.folderPath.ToCStr().Get(), 
-				params.layerName.ToCStr().Get(), 
-				params.baseID.ToCStr().Get(),
-				params.hideLayer ? "true" : "false"));
-		}
+		// if (BrowserRepl::HasInstance()) {
+		//	BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[C++] Создание слоя: папка='%s', слой='%s', ID='%s', hide=%s", 
+		//		params.folderPath.ToCStr().Get(), 
+		//		params.layerName.ToCStr().Get(), 
+		//		params.baseID.ToCStr().Get(),
+		//		params.hideLayer ? "true" : "false"));
+		// }
 		
 		const bool success = LayerHelper::CreateLayerAndMoveElements(params);
 		return ConvertToJavaScriptVariable(success);
@@ -536,7 +484,7 @@ void BrowserRepl::RegisterACAPIJavaScriptObject(DG::Browser& targetBrowser)
 
 	// --- Get Layers List API ---
 	jsACAPI->AddItem(new JS::Function("GetLayersList", [](GS::Ref<JS::Base>) {
-		if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] GetLayersList()");
+		// if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] GetLayersList()");
 		const GS::Array<LayerHelper::LayerInfo> layers = LayerHelper::GetLayersList();
 		return ConvertToJavaScriptVariable(layers);
 		}));
@@ -544,54 +492,54 @@ void BrowserRepl::RegisterACAPIJavaScriptObject(DG::Browser& targetBrowser)
 	// --- ΔZ API (двухшаговый буфер + совместимость со старым мостом) ---
 	jsACAPI->AddItem(new JS::Function("SetZDelta", [](GS::Ref<JS::Base> param) {
 		g_lastZDeltaMeters = GetDoubleFromJs(param, 0.0);
-		if (BrowserRepl::HasInstance())
-			BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] SetZDelta=%.3f m", g_lastZDeltaMeters));
+		// if (BrowserRepl::HasInstance())
+		//	BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] SetZDelta=%.3f m", g_lastZDeltaMeters));
 		return new JS::Value(true);
 		}));
 
 	jsACAPI->AddItem(new JS::Function("ApplyZDelta", [](GS::Ref<JS::Base> param) {
 		// Диагностика: проверяем что пришло
-		if (BrowserRepl::HasInstance()) {
-			if (param == nullptr) {
-				BrowserRepl::GetInstance().LogToBrowser("[JS] ApplyZDelta: param is nullptr!");
-			} else if (GS::Ref<JS::Value> v = GS::DynamicCast<JS::Value>(param)) {
-				const auto t = v->GetType();
-				if (t == JS::Value::DOUBLE || t == JS::Value::INTEGER) {
-					BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] ApplyZDelta: got number %.6f", v->GetDouble()));
-				} else if (t == JS::Value::STRING) {
-					BrowserRepl::GetInstance().LogToBrowser("[JS] ApplyZDelta: got string '" + v->GetString() + "'");
-				} else {
-					BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] ApplyZDelta: got type %d", (int)t));
-				}
-			} else {
-				BrowserRepl::GetInstance().LogToBrowser("[JS] ApplyZDelta: param is not JS::Value");
-			}
-		}
+		// if (BrowserRepl::HasInstance()) {
+		//	if (param == nullptr) {
+		//		BrowserRepl::GetInstance().LogToBrowser("[JS] ApplyZDelta: param is nullptr!");
+		//	} else if (GS::Ref<JS::Value> v = GS::DynamicCast<JS::Value>(param)) {
+		//		const auto t = v->GetType();
+		//		if (t == JS::Value::DOUBLE || t == JS::Value::INTEGER) {
+		//			BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] ApplyZDelta: got number %.6f", v->GetDouble()));
+		//		} else if (t == JS::Value::STRING) {
+		//			BrowserRepl::GetInstance().LogToBrowser("[JS] ApplyZDelta: got string '" + v->GetString() + "'");
+		//		} else {
+		//			BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] ApplyZDelta: got type %d", (int)t));
+		//		}
+		//	} else {
+		//		BrowserRepl::GetInstance().LogToBrowser("[JS] ApplyZDelta: param is not JS::Value");
+		//	}
+		// }
 		
 		const double val = (param != nullptr) ? GetDoubleFromJs(param, g_lastZDeltaMeters) : g_lastZDeltaMeters;
-		if (BrowserRepl::HasInstance())
-			BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] ApplyZDelta(%.3f m)", val));
+		// if (BrowserRepl::HasInstance())
+		//	BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] ApplyZDelta(%.3f m)", val));
 		const bool ok = GroundHelper::ApplyZDelta(val);
 		return new JS::Value(ok);
 		}));
 
 	// --- Ground API (посадка на Mesh) ---
 	jsACAPI->AddItem(new JS::Function("SetGroundSurface", [](GS::Ref<JS::Base>) {
-		if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] SetGroundSurface()");
+		// if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] SetGroundSurface()");
 		const bool ok = GroundHelper::SetGroundSurface();
 		return new JS::Value(ok);
 		}));
 
 	jsACAPI->AddItem(new JS::Function("SetGroundObjects", [](GS::Ref<JS::Base>) {
-		if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] SetGroundObjects()");
+		// if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] SetGroundObjects()");
 		const bool ok = GroundHelper::SetGroundObjects();
 		return new JS::Value(ok);
 		}));
 
 	jsACAPI->AddItem(new JS::Function("ApplyGroundOffset", [](GS::Ref<JS::Base> param) {
 		const double offset = GetDoubleFromJs(param, 0.0); // offset на C++ стороне сейчас игнорируется, но логируем
-		if (BrowserRepl::HasInstance())
-			BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] ApplyGroundOffset(%.3f m)", offset));
+		// if (BrowserRepl::HasInstance())
+		//	BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] ApplyGroundOffset(%.3f m)", offset));
 		const bool ok = GroundHelper::ApplyGroundOffset(offset);
 		return new JS::Value(ok);
 		}));
@@ -599,51 +547,51 @@ void BrowserRepl::RegisterACAPIJavaScriptObject(DG::Browser& targetBrowser)
 	// --- Rotate API ---
 	jsACAPI->AddItem(new JS::Function("RotateSelected", [](GS::Ref<JS::Base> param) {
 		const double angle = GetDoubleFromJs(param, 0.0);
-		if (BrowserRepl::HasInstance())
-			BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] RotateSelected angle=%.2f", angle));
+		// if (BrowserRepl::HasInstance())
+		//	BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] RotateSelected angle=%.2f", angle));
 		return new JS::Value(RotateHelper::RotateSelected(angle));
 		}));
 
 	jsACAPI->AddItem(new JS::Function("AlignSelectedX", [](GS::Ref<JS::Base>) {
-		if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] AlignSelectedX()");
+		// if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] AlignSelectedX()");
 		return new JS::Value(RotateHelper::AlignSelectedX());
 		}));
 
 	jsACAPI->AddItem(new JS::Function("RandomizeSelectedAngles", [](GS::Ref<JS::Base>) {
-		if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] RandomizeSelectedAngles()");
+		// if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] RandomizeSelectedAngles()");
 		return new JS::Value(RotateHelper::RandomizeSelectedAngles());
 		}));
 
 	jsACAPI->AddItem(new JS::Function("OrientObjectsToPoint", [](GS::Ref<JS::Base>) {
-		if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] OrientObjectsToPoint()");
+		// if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] OrientObjectsToPoint()");
 		return new JS::Value(RotateHelper::OrientObjectsToPoint());
 		}));
 
 	// --- GDL Generator ---
 	jsACAPI->AddItem(new JS::Function("GenerateGDLFromSelection", [](GS::Ref<JS::Base>) {
-		if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] GenerateGDLFromSelection()");
+		// if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] GenerateGDLFromSelection()");
 		return new JS::Value(GDLHelper::GenerateGDLFromSelection());
 		}));
 
 	// --- Landscape API (заглушки с логом) ---
 	jsACAPI->AddItem(new JS::Function("SetDistributionLine", [](GS::Ref<JS::Base>) {
-		if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] SetDistributionLine()");
+		// if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] SetDistributionLine()");
 		return new JS::Value(LandscapeHelper::SetDistributionLine());
 		}));
 	jsACAPI->AddItem(new JS::Function("SetDistributionObject", [](GS::Ref<JS::Base>) {
-		if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] SetDistributionObject()");
+		// if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] SetDistributionObject()");
 		return new JS::Value(LandscapeHelper::SetDistributionObject());
 		}));
 	jsACAPI->AddItem(new JS::Function("SetDistributionStep", [](GS::Ref<JS::Base> param) {
 		const double step = GetDoubleFromJs(param, 0.0);
-		if (BrowserRepl::HasInstance())
-			BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] SetDistributionStep step=%.3f", step));
+		// if (BrowserRepl::HasInstance())
+		//	BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] SetDistributionStep step=%.3f", step));
 		return new JS::Value(LandscapeHelper::SetDistributionStep(step));
 		}));
 	jsACAPI->AddItem(new JS::Function("SetDistributionCount", [](GS::Ref<JS::Base> param) {
 		const int count = (int)std::llround(GetDoubleFromJs(param, 0.0));
-		if (BrowserRepl::HasInstance())
-			BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] SetDistributionCount count=%d", count));
+		// if (BrowserRepl::HasInstance())
+		//	BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] SetDistributionCount count=%d", count));
 		return new JS::Value(LandscapeHelper::SetDistributionCount(count));
 		}));
 	jsACAPI->AddItem(new JS::Function("DistributeNow", [](GS::Ref<JS::Base> param) {
@@ -665,56 +613,56 @@ void BrowserRepl::RegisterACAPIJavaScriptObject(DG::Browser& targetBrowser)
 			default: break;
 			}
 		}
-		if (BrowserRepl::HasInstance()) {
-			BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] DistributeNow parsed: step=%.6f, count=%d", step, count));
-		}
+		// if (BrowserRepl::HasInstance()) {
+		//	BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] DistributeNow parsed: step=%.6f, count=%d", step, count));
+		// }
 		return new JS::Value(LandscapeHelper::DistributeSelected(step, count));
 		}));
 
 	// --- Beam Orientation API ---
 	jsACAPI->AddItem(new JS::Function("SetBeams", [](GS::Ref<JS::Base>) {
-		if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] SetBeams()");
+		// if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] SetBeams()");
 		return new JS::Value(ColumnOrientHelper::SetBeams());
 		}));
 	jsACAPI->AddItem(new JS::Function("SetMeshForColumns", [](GS::Ref<JS::Base>) {
-		if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] SetMeshForColumns()");
+		// if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] SetMeshForColumns()");
 		return new JS::Value(ColumnOrientHelper::SetMesh());
 		}));
 	jsACAPI->AddItem(new JS::Function("OrientBeamsToSurface", [](GS::Ref<JS::Base>) {
-		if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] OrientBeamsToSurface()");
+		// if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] OrientBeamsToSurface()");
 		return new JS::Value(ColumnOrientHelper::OrientBeamsToSurface());
 		}));
 	jsACAPI->AddItem(new JS::Function("RotateSelectedOrientation", [](GS::Ref<JS::Base> param) {
 		// Диагностика параметра (для отладки)
 		double angleDeg = 0.0;
-		if (BrowserRepl::HasInstance()) {
-			if (param == nullptr) {
-				BrowserRepl::GetInstance().LogToBrowser("[JS] RotateSelectedOrientation: param is nullptr!");
-			} else if (GS::Ref<JS::Value> v = GS::DynamicCast<JS::Value>(param)) {
-				const auto t = v->GetType();
-				if (t == JS::Value::DOUBLE) {
-					angleDeg = v->GetDouble();
-					BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] RotateSelectedOrientation: got DOUBLE %.6f", angleDeg));
-				} else if (t == JS::Value::INTEGER) {
-					angleDeg = static_cast<double>(v->GetInteger());
-					BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] RotateSelectedOrientation: got INTEGER %d -> %.6f", (int)v->GetInteger(), angleDeg));
-				} else if (t == JS::Value::STRING) {
-					BrowserRepl::GetInstance().LogToBrowser("[JS] RotateSelectedOrientation: got string '" + v->GetString() + "'");
-					angleDeg = GetDoubleFromJs(param, 0.0);
-				} else {
-					BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] RotateSelectedOrientation: got unknown type %d", (int)t));
-					angleDeg = GetDoubleFromJs(param, 0.0);
-				}
-			} else {
-				BrowserRepl::GetInstance().LogToBrowser("[JS] RotateSelectedOrientation: param is not JS::Value, using GetDoubleFromJs");
-				angleDeg = GetDoubleFromJs(param, 0.0);
-			}
-		} else {
+		// if (BrowserRepl::HasInstance()) {
+		//	if (param == nullptr) {
+		//		BrowserRepl::GetInstance().LogToBrowser("[JS] RotateSelectedOrientation: param is nullptr!");
+		//	} else if (GS::Ref<JS::Value> v = GS::DynamicCast<JS::Value>(param)) {
+		//		const auto t = v->GetType();
+		//		if (t == JS::Value::DOUBLE) {
+		//			angleDeg = v->GetDouble();
+		//			BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] RotateSelectedOrientation: got DOUBLE %.6f", angleDeg));
+		//		} else if (t == JS::Value::INTEGER) {
+		//			angleDeg = static_cast<double>(v->GetInteger());
+		//			BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] RotateSelectedOrientation: got INTEGER %d -> %.6f", (int)v->GetInteger(), angleDeg));
+		//		} else if (t == JS::Value::STRING) {
+		//			BrowserRepl::GetInstance().LogToBrowser("[JS] RotateSelectedOrientation: got string '" + v->GetString() + "'");
+		//			angleDeg = GetDoubleFromJs(param, 0.0);
+		//		} else {
+		//			BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] RotateSelectedOrientation: got unknown type %d", (int)t));
+		//			angleDeg = GetDoubleFromJs(param, 0.0);
+		//		}
+		//	} else {
+		//		BrowserRepl::GetInstance().LogToBrowser("[JS] RotateSelectedOrientation: param is not JS::Value, using GetDoubleFromJs");
+		//		angleDeg = GetDoubleFromJs(param, 0.0);
+		//	}
+		// } else {
 			angleDeg = GetDoubleFromJs(param, 0.0);
-		}
+		// }
 		
-		if (BrowserRepl::HasInstance())
-			BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] RotateSelectedOrientation final: angleDeg=%.3f", angleDeg));
+		// if (BrowserRepl::HasInstance())
+		//	BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] RotateSelectedOrientation final: angleDeg=%.3f", angleDeg));
 		return new JS::Value(ColumnOrientHelper::RotateSelected(angleDeg));
 		}));
 
@@ -728,8 +676,8 @@ void BrowserRepl::RegisterACAPIJavaScriptObject(DG::Browser& targetBrowser)
 #ifdef DEBUG_UI_LOGS
 		ACAPI_WriteReport("[OpenHelp] url=%s", false, url.ToCStr().Get());
 #endif
-		if (BrowserRepl::HasInstance())
-			BrowserRepl::GetInstance().LogToBrowser("[C++] OpenHelp to " + url);
+		// if (BrowserRepl::HasInstance())
+		//	BrowserRepl::GetInstance().LogToBrowser("[C++] OpenHelp to " + url);
 		HelpPalette::ShowWithURL(url);
 		return new JS::Value(true);
 		}));
@@ -806,11 +754,28 @@ void BrowserRepl::RegisterACAPIJavaScriptObject(DG::Browser& targetBrowser)
 		return new JS::Value(true);
 		}));
 
+	jsACAPI->AddItem(new JS::Function("OpenSelectionDetailsPalette", [](GS::Ref<JS::Base>) {
+#ifdef DEBUG_UI_LOGS
+		ACAPI_WriteReport("[OpenSelectionDetailsPalette] request", false);
+#endif
+		SelectionDetailsPalette::ShowPalette();
+		return new JS::Value(true);
+		}));
+
+	jsACAPI->AddItem(new JS::Function("ClosePalette", [](GS::Ref<JS::Base>) {
+#ifdef DEBUG_UI_LOGS
+		ACAPI_WriteReport("[ClosePalette] request", false);
+#endif
+		if (BrowserRepl::HasInstance() && BrowserRepl::GetInstance().IsVisible())
+			BrowserRepl::GetInstance().Hide();
+		return new JS::Value(true);
+		}));
+
 	jsACAPI->AddItem(new JS::Function("LogMessage", [](GS::Ref<JS::Base> param) {
 		if (GS::Ref<JS::Value> v = GS::DynamicCast<JS::Value>(param)) {
 			if (v->GetType() == JS::Value::STRING) {
 				GS::UniString s = v->GetString();
-				if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] " + s);
+				// if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] " + s);
 			}
 		}
 		return new JS::Value(true);
@@ -819,26 +784,26 @@ void BrowserRepl::RegisterACAPIJavaScriptObject(DG::Browser& targetBrowser)
 	// --- Markup API (разметка размерами) ---
 	jsACAPI->AddItem(new JS::Function("SetMarkupStep", [](GS::Ref<JS::Base> param) {
 		// Диагностика: проверяем что пришло
-		if (BrowserRepl::HasInstance()) {
-			if (param == nullptr) {
-				BrowserRepl::GetInstance().LogToBrowser("[JS] SetMarkupStep: param is nullptr!");
-			} else if (GS::Ref<JS::Value> v = GS::DynamicCast<JS::Value>(param)) {
-				const auto t = v->GetType();
-				if (t == JS::Value::DOUBLE || t == JS::Value::INTEGER) {
-					BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] SetMarkupStep: got number %.6f", v->GetDouble()));
-				} else if (t == JS::Value::STRING) {
-					BrowserRepl::GetInstance().LogToBrowser("[JS] SetMarkupStep: got string '" + v->GetString() + "'");
-				} else {
-					BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] SetMarkupStep: got type %d", (int)t));
-				}
-			} else {
-				BrowserRepl::GetInstance().LogToBrowser("[JS] SetMarkupStep: param is not JS::Value");
-			}
-		}
+		// if (BrowserRepl::HasInstance()) {
+		//	if (param == nullptr) {
+		//		BrowserRepl::GetInstance().LogToBrowser("[JS] SetMarkupStep: param is nullptr!");
+		//	} else if (GS::Ref<JS::Value> v = GS::DynamicCast<JS::Value>(param)) {
+		//		const auto t = v->GetType();
+		//		if (t == JS::Value::DOUBLE || t == JS::Value::INTEGER) {
+		//			BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] SetMarkupStep: got number %.6f", v->GetDouble()));
+		//		} else if (t == JS::Value::STRING) {
+		//			BrowserRepl::GetInstance().LogToBrowser("[JS] SetMarkupStep: got string '" + v->GetString() + "'");
+		//		} else {
+		//			BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] SetMarkupStep: got type %d", (int)t));
+		//		}
+		//	} else {
+		//		BrowserRepl::GetInstance().LogToBrowser("[JS] SetMarkupStep: param is not JS::Value");
+		//	}
+		// }
 		
 		const double stepMM = GetDoubleFromJs(param, 0.0);
-		if (BrowserRepl::HasInstance())
-			BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] SetMarkupStep parsed=%.1f mm", stepMM));
+		// if (BrowserRepl::HasInstance())
+		//	BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] SetMarkupStep parsed=%.1f mm", stepMM));
 		return new JS::Value(MarkupHelper::SetMarkupStep(stepMM));
 		}));
 
@@ -847,23 +812,23 @@ void BrowserRepl::RegisterACAPIJavaScriptObject(DG::Browser& targetBrowser)
 		}));
 
 	jsACAPI->AddItem(new JS::Function("CreateDimensionsToLine", [](GS::Ref<JS::Base>) {
-		if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] CreateDimensionsToLine()");
+		// if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] CreateDimensionsToLine()");
 		return new JS::Value(MarkupHelper::CreateDimensionsToLine());
 		}));
 
 	jsACAPI->AddItem(new JS::Function("CreateDimensionsBetweenObjects", [](GS::Ref<JS::Base>) {
-		if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] CreateDimensionsBetweenObjects()");
+		// if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] CreateDimensionsBetweenObjects()");
 		return new JS::Value(MarkupHelper::CreateDimensionsBetweenObjects());
 		}));
 
 	jsACAPI->AddItem(new JS::Function("CreateDimensionsToPoint", [](GS::Ref<JS::Base>) {
-		if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] CreateDimensionsToPoint()");
+		// if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] CreateDimensionsToPoint()");
 		return new JS::Value(MarkupHelper::CreateDimensionsToPoint());
 		}));
 
 	// --- Road API (выбор осевой линии) ---
 	jsACAPI->AddItem(new JS::Function("SetBaseLineForShell", [](GS::Ref<JS::Base>) {
-		if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] SetBaseLineForShell() [Shell]");
+		// if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] SetBaseLineForShell() [Shell]");
 		
 		// Используем ShellHelper для установки базовой линии (работает для контуров)
 		const bool success = ShellHelper::SetBaseLineForShell();
@@ -877,7 +842,7 @@ void BrowserRepl::RegisterACAPIJavaScriptObject(DG::Browser& targetBrowser)
 		}));
 
 	jsACAPI->AddItem(new JS::Function("SetMeshSurfaceForShell", [](GS::Ref<JS::Base>) {
-		if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] SetMeshSurfaceForShell() [Shell]");
+		// if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] SetMeshSurfaceForShell() [Shell]");
 		
 		// Вызываем ShellHelper::SetMeshSurfaceForShell(), который установит mesh в ShellHelper и GroundHelper
 		const bool success = ShellHelper::SetMeshSurfaceForShell();
@@ -892,7 +857,7 @@ void BrowserRepl::RegisterACAPIJavaScriptObject(DG::Browser& targetBrowser)
 
 	// --- Create Mesh from Contour ---
 	jsACAPI->AddItem(new JS::Function("CreateMeshFromContour", [](GS::Ref<JS::Base> param) {
-		if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] CreateMeshFromContour() - создание Mesh из контура");
+		// if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] CreateMeshFromContour() - создание Mesh из контура");
 		
 		// Парсим параметры: принимаем строку "leftWidth:..,rightWidth:..,step:..,offset:.."
 		double leftWidth = 600.0;  // мм по умолчанию
@@ -926,12 +891,12 @@ void BrowserRepl::RegisterACAPIJavaScriptObject(DG::Browser& targetBrowser)
 			}
 		}
 		
-		if (BrowserRepl::HasInstance()) {
-			BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf(
-				"[JS] CreateMeshFromContour parsed: leftWidth=%.1fmm, rightWidth=%.1fmm, step=%.1fmm, offset=%.1fmm",
-				leftWidth, rightWidth, step, offset
-			));
-		}
+		// if (BrowserRepl::HasInstance()) {
+		//	BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf(
+		//		"[JS] CreateMeshFromContour parsed: leftWidth=%.1fmm, rightWidth=%.1fmm, step=%.1fmm, offset=%.1fmm",
+		//		leftWidth, rightWidth, step, offset
+		//	));
+		// }
 		
 		bool success = ShellHelper::CreateMeshFromContour(leftWidth, rightWidth, step, offset);
 		return new JS::Value(success);
@@ -939,7 +904,7 @@ void BrowserRepl::RegisterACAPIJavaScriptObject(DG::Browser& targetBrowser)
 	
 	// --- Get Surface Finishes List (покрытия) ---
 	jsACAPI->AddItem(new JS::Function("GetSurfaceFinishesList", [](GS::Ref<JS::Base> param) {
-		if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] GetSurfaceFinishesList()");
+		// if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] GetSurfaceFinishesList()");
 		
 		GS::Array<RoadHelper::SurfaceFinishInfo> finishes = RoadHelper::GetSurfaceFinishesList();
 		
@@ -992,9 +957,9 @@ void BrowserRepl::RegisterACAPIJavaScriptObject(DG::Browser& targetBrowser)
 			}
 		}
 		
-		if (BrowserRepl::HasInstance()) {
-			BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] CreateShellFromLine parsed: width=%.1fmm, step=%.1fmm", width, step));
-		}
+		// if (BrowserRepl::HasInstance()) {
+		//	BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] CreateShellFromLine parsed: width=%.1fmm, step=%.1fmm", width, step));
+		// }
 		
 #ifdef DEBUG_UI_LOGS
 		ACAPI_WriteReport("[BrowserRepl] Вызов RoadHelper::BuildRoad", false);
@@ -1011,17 +976,62 @@ void BrowserRepl::RegisterACAPIJavaScriptObject(DG::Browser& targetBrowser)
 
 	// --- Register object in the browser ---
 	targetBrowser.RegisterAsynchJSObject(jsACAPI);
-	if (BrowserRepl::HasInstance())
-		BrowserRepl::GetInstance().LogToBrowser("[C++] JS bridge registered");
+	// if (BrowserRepl::HasInstance())
+	//	BrowserRepl::GetInstance().LogToBrowser("[C++] JS bridge registered");
 }
 
 // ------------------- Palette and Events ----------------------
-void BrowserRepl::UpdateSelectedElementsOnHTML()
+
+void BrowserRepl::ButtonClicked(const DG::ButtonClickEvent& ev)
 {
+	const DG::ButtonItem* clickedButton = ev.GetSource();
+	if (clickedButton == nullptr) return;
+
+	const short buttonId = clickedButton->GetId();
 #ifdef DEBUG_UI_LOGS
-	ACAPI_WriteReport("[BrowserRepl] UpdateSelectedElementsOnHTML()", false);
+	ACAPI_WriteReport("[BrowserRepl] ButtonClicked: id=%d", false, (int)buttonId);
 #endif
-	browser.ExecuteJS("UpdateSelectedElements()");
+
+	switch (buttonId) {
+		case ToolbarButtonCloseId:
+			Hide();
+			break;
+		case ToolbarButtonTableId:
+			SelectionDetailsPalette::ShowPalette();
+			break;
+		case ToolbarButtonSplineId:
+			DistributionPalette::ShowPalette();
+			break;
+		case ToolbarButtonRotateId:
+			OrientationPalette::ShowPalette();
+			break;
+		case ToolbarButtonRotSurfId:
+			AnglePalette::ShowPalette();
+			break;
+		case ToolbarButtonLandId:
+			GroundPalette::ShowPalette();
+			break;
+		case ToolbarButtonDimsId:
+			MarkupPalette::ShowPalette();
+			break;
+		case ToolbarButtonLayersId:
+			IdLayersPalette::ShowPalette();
+			break;
+		case ToolbarButtonContourId:
+			ContourPalette::ShowPalette();
+			break;
+		case ToolbarButtonMeshId:
+			MeshPalette::ShowPalette();
+			break;
+		case ToolbarButtonCSVId:
+			SendXlsPalette::ShowPalette();
+			break;
+		case ToolbarButtonSupportId:
+			HelpPalette::ShowWithURL("https://landscape.227.info/help");
+			break;
+		default:
+			break;
+	}
 }
 
 void BrowserRepl::SetMenuItemCheckedState(bool isChecked)
@@ -1040,12 +1050,8 @@ void BrowserRepl::SetMenuItemCheckedState(bool isChecked)
 
 void BrowserRepl::PanelResized(const DG::PanelResizeEvent& ev)
 {
-#ifdef DEBUG_UI_LOGS
-	ACAPI_WriteReport("[BrowserRepl] PanelResized dx=%d dy=%d", false, (int)ev.GetHorizontalChange(), (int)ev.GetVerticalChange());
-#endif
-	BeginMoveResizeItems();
-	browser.Resize(ev.GetHorizontalChange(), ev.GetVerticalChange());
-	EndMoveResizeItems();
+	// Toolbar buttons don't need resizing
+	(void)ev;
 }
 
 void BrowserRepl::PanelCloseRequested(const DG::PanelCloseRequestEvent&, bool* accepted)
@@ -1054,18 +1060,10 @@ void BrowserRepl::PanelCloseRequested(const DG::PanelCloseRequestEvent&, bool* a
 	ACAPI_WriteReport("[BrowserRepl] PanelCloseRequested will Hide", false);
 #endif
 	Hide();
-	*accepted = true;
+	if (accepted) *accepted = true;
 }
 
-GSErrCode __ACENV_CALL BrowserRepl::SelectionChangeHandler(const API_Neig*)
-{
-#ifdef DEBUG_UI_LOGS
-	ACAPI_WriteReport("[BrowserRepl] Selection changed then update UI", false);
-#endif
-	if (BrowserRepl::HasInstance())
-		BrowserRepl::GetInstance().UpdateSelectedElementsOnHTML();
-	return NoError;
-}
+// SelectionChangeHandler removed - not needed for toolbar
 
 GSErrCode __ACENV_CALL BrowserRepl::PaletteControlCallBack(Int32, API_PaletteMessageID messageID, GS::IntPtr param)
 {

@@ -10,6 +10,7 @@
 
 #include	"APIEnvir.h"
 #include	"ACAPinc.h"		// also includes APIdefs.h
+#include	"ResourceIDs.hpp"
 #include	"BrowserRepl.hpp"
 #include    "HelpPalette.hpp"  
 #include    "DistributionPalette.hpp"
@@ -21,6 +22,7 @@
 #include    "IdLayersPalette.hpp"
 #include    "AnglePalette.hpp"
 #include    "SendXlsPalette.hpp"
+#include    "SelectionDetailsPalette.hpp"
 
 // -----------------------------------------------------------------------------
 // Show or Hide Browser Palette
@@ -28,11 +30,18 @@
 
 static void	ShowOrHideBrowserRepl ()
 {
-	if (BrowserRepl::HasInstance () && BrowserRepl::GetInstance ().IsVisible ()) {
+	ACAPI_WriteReport("[Main] ShowOrHideBrowserRepl called", false);
+	
+	if (!BrowserRepl::HasInstance ()) {
+		ACAPI_WriteReport("[Main] Creating BrowserRepl instance", false);
+		BrowserRepl::CreateInstance ();
+	}
+	
+	if (BrowserRepl::GetInstance ().IsVisible ()) {
+		ACAPI_WriteReport("[Main] Hiding BrowserRepl", false);
 		BrowserRepl::GetInstance ().Hide ();
 	} else {
-		if (!BrowserRepl::HasInstance ())
-			BrowserRepl::CreateInstance ();
+		ACAPI_WriteReport("[Main] Showing BrowserRepl", false);
 		BrowserRepl::GetInstance ().Show ();
 	}
 }
@@ -44,13 +53,23 @@ static void	ShowOrHideBrowserRepl ()
 
 GSErrCode __ACENV_CALL MenuCommandHandler (const API_MenuParams *menuParams)
 {
+	ACAPI_WriteReport("[Main] MenuCommandHandler: menuResID=%d, itemIndex=%d", false, 
+		(int)menuParams->menuItemRef.menuResID, (int)menuParams->menuItemRef.itemIndex);
+	
 	switch (menuParams->menuItemRef.menuResID) {
 		case BrowserReplMenuResId:
 			switch (menuParams->menuItemRef.itemIndex) {
-				case BrowserReplMenuItemIndex:
+				case BrowserReplMenuItemIndex:  // "Toolbar" - opens palette 32500
+					ACAPI_WriteReport("[Main] Handling Toolbar menu item", false);
 					ShowOrHideBrowserRepl ();
 					break;
+				default:
+					ACAPI_WriteReport("[Main] Unknown menu item index: %d", false, (int)menuParams->menuItemRef.itemIndex);
+					break;
 			}
+			break;
+		default:
+			ACAPI_WriteReport("[Main] Unknown menuResID: %d", false, (int)menuParams->menuItemRef.menuResID);
 			break;
 	}
 
@@ -103,10 +122,8 @@ GSErrCode __ACENV_CALL Initialize ()
     if (DBERROR (err != NoError))
         return err;
 
-    // 2) Нотификация выбора
-    err = ACAPI_Notification_CatchSelectionChange (BrowserRepl::SelectionChangeHandler);
-    if (DBERROR (err != NoError))
-        return err;
+    // 2) Нотификация выбора - регистрируется внутри SelectionDetailsPalette при создании
+    // (не нужно регистрировать здесь, так как SelectionDetailsPalette сам подписывается)
 
     // 3) Регистрация модельных окон (палитр) — аккумулируем ошибки
     GSErrCode palErr = NoError;
@@ -121,6 +138,7 @@ GSErrCode __ACENV_CALL Initialize ()
     palErr |= IdLayersPalette::RegisterPaletteControlCallBack ();
     palErr |= AnglePalette::RegisterPaletteControlCallBack ();
 	palErr |= SendXlsPalette::RegisterPaletteControlCallBack ();
+	palErr |= SelectionDetailsPalette::RegisterPaletteControlCallBack ();
 
     if (DBERROR (palErr != NoError))
         return palErr;

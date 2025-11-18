@@ -8,22 +8,27 @@
 
 namespace DG { class Browser; }
 
-class DistributionPalette : public DG::Palette, public DG::PanelObserver
+// Forward declaration
+struct API_Neig;
+
+class SelectionDetailsPalette : public DG::Palette, public DG::PanelObserver
 {
 public:
 	static bool         HasInstance();
 	static void         CreateInstance();
-	static DistributionPalette& GetInstance();
+	static SelectionDetailsPalette& GetInstance();
 	static void         DestroyInstance();
 
 	static void         ShowPalette();
 	static void         HidePalette();
+	static void         UpdateSelectedElementsOnHTML();
 	static GSErrCode    RegisterPaletteControlCallBack();
+	static GSErrCode    SelectionChangeHandler(const API_Neig* neig);
 
-	virtual ~DistributionPalette();
+	virtual ~SelectionDetailsPalette();
 
 private:
-	DistributionPalette();
+	SelectionDetailsPalette();
 
 	void                Init();
 	void                LoadHtml();
@@ -32,13 +37,9 @@ private:
 	void PanelCloseRequested(const DG::PanelCloseRequestEvent& ev, bool* accepted) override;
 
 private:
-	static GS::Ref<DistributionPalette> s_instance;
-	static const GS::Guid               s_guid;
+	static GS::Ref<SelectionDetailsPalette> s_instance;
+	static const GS::Guid                   s_guid;
 
 	DG::Browser* m_browserCtrl = nullptr;
 };
-
-
-
-
 
