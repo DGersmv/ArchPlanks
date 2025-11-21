@@ -9,19 +9,40 @@
 
 'STR#' 32501 "Strings for the Menu" {
 /* [   ] */		"Landscape"
-/* [   ] */		"Smart-panel"
-/* [  1] */			"Landscape Helper^INT"
-
+/* [  1] */		"Landscape Helper"
+/* [  2] */		"Toolbar"
 }
 
-/* --- Dockable browser palette ----------------------------------------------*/
+/* --- Dockable toolbar palette ----------------------------------------------*/
 
-'GDLG'  32500    Palette | topCaption | close | grow   0   0  450  150  "Lanscape Helper"  {
-/* [  1] */ Browser			0   0  450  150
+'GDLG'  32500    Palette | leftCaption | noGrow   0   0  363  32  ""  {
+/* [  0] */ IconButton          3    1   30   30    32111									/* Close button */
+/* [  1] */ IconButton         33    1   30   30    32100									/* Table - Selection Details */
+/* [  2] */ IconButton         63    1   30   30    32101									/* Spline - Distribution */
+/* [  3] */ IconButton         93    1   30   30    32102									/* Rotate - Orientation */
+/* [  4] */ IconButton        123    1   30   30    32103									/* RotSurf - Angle */
+/* [  5] */ IconButton        153    1   30   30    32104									/* Land - Ground */
+/* [  6] */ IconButton        183    1   30   30    32105									/* Dims - Markup */
+/* [  7] */ IconButton        213    1   30   30    32106									/* Layers - ID & Layers */
+/* [  8] */ IconButton        243    1   30   30    32107									/* Contour */
+/* [  9] */ IconButton        273    1   30   30    32108									/* Mesh */
+/* [ 10] */ IconButton        303    1   30   30    32109									/* CSV - Send to Excel */
+/* [ 11] */ IconButton        333    1   30   30    32110									/* Support - Help */
 }
 
 'DLGH'  32500  DLG_32500_Browser_Repl {
-1	"Browser Control"		Browser_0
+1	"Close"					IconButton_0
+2	"Selection Details"		IconButton_1
+3	"Distribution"			IconButton_2
+4	"Orientation"			IconButton_3
+5	"Angle"					IconButton_4
+6	"Ground"				IconButton_5
+7	"Markup"				IconButton_6
+8	"ID & Layers"			IconButton_7
+9	"Contour"				IconButton_8
+10	"Mesh"					IconButton_9
+11	"Send to Excel"		IconButton_10
+12	"Support"				IconButton_11
 }
 
 /* --- Dockable browser palette: HELP ---------------------------------------*/
@@ -122,4 +143,14 @@
 
 'DLGH'  32600  DLG_32600_SendXls_Browser {
 1   "SendXls Browser Control"     Browser_0
+}
+
+/* --- Dockable browser palette: SELECTION DETAILS ---------------------------------------*/
+
+'GDLG'  32610    Palette | topCaption | close | grow   0   0  400  450  "Selection Details"  {
+/* [  1] */ Browser         0   0  400  450
+}
+
+'DLGH'  32610  DLG_32610_SelectionDetails_Browser {
+1   "SelectionDetails Browser Control"     Browser_0
 }

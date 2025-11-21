@@ -173,3 +173,5 @@ void OrientationPalette::PanelCloseRequested(const DG::PanelCloseRequestEvent&, 
 
 
 
+
+

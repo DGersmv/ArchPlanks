@@ -43,7 +43,7 @@ namespace RoadHelper {
         GS::UniString s(buf);
 
         if (BrowserRepl::HasInstance()) {
-            BrowserRepl::GetInstance().LogToBrowser(s);
+            // BrowserRepl::GetInstance().LogToBrowser(s);
         }
 
 #ifdef DEBUG_UI_LOGS

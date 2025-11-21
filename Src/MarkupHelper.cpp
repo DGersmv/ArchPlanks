@@ -33,9 +33,10 @@ namespace MarkupHelper {
 	// ============================================================================
 	static inline void Log(const GS::UniString& msg)
 	{
-		if (BrowserRepl::HasInstance())
-			BrowserRepl::GetInstance().LogToBrowser("[Markup] " + msg);
+		// if (BrowserRepl::HasInstance())
+		//	BrowserRepl::GetInstance().LogToBrowser("[Markup] " + msg);
 		// ACAPI_WriteReport("[Markup] %s", false, msg.ToCStr().Get());
+		(void)msg;
 	}
 
 	// ============================================================================

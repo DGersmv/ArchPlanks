@@ -173,3 +173,5 @@ void ContourPalette::PanelCloseRequested(const DG::PanelCloseRequestEvent&, bool
 
 
 
+
+
