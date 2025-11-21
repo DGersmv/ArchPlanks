@@ -426,15 +426,33 @@ void BrowserRepl::RegisterACAPIJavaScriptObject(DG::Browser& targetBrowser)
 			return ConvertToJavaScriptVariable(false);
 		}
 
-		// Пишем BOM UTF‑8, затем содержимое в кодировке по умолчанию UniString->CStr (обычно UTF‑8)
+		// Пишем BOM UTF‑8 для правильного распознавания Excel
 		const unsigned char bom[3] = { 0xEF, 0xBB, 0xBF };
 		fwrite(bom, 1, 3, fp);
 
+		// Конвертируем UniString в UTF-8 через Windows API
+		// UniString внутренне хранит UTF-16, получаем через GetLength и итерацию
 		GS::UniString dataToWrite = csvData;
-		const char* bytes = dataToWrite.ToCStr().Get();
-		if (bytes != nullptr) {
-			const size_t len = strlen(bytes);
-			fwrite(bytes, 1, len, fp);
+		const USize len = dataToWrite.GetLength();
+		if (len > 0) {
+			// Выделяем буфер для UTF-16
+			wchar_t* wideBuffer = new wchar_t[len + 1];
+			for (USize i = 0; i < len; ++i) {
+				wideBuffer[i] = static_cast<wchar_t>(dataToWrite[i]);
+			}
+			wideBuffer[len] = L'\0';
+
+			// Конвертируем UTF-16 в UTF-8
+			int utf8Len = WideCharToMultiByte(CP_UTF8, 0, wideBuffer, -1, nullptr, 0, nullptr, nullptr);
+			if (utf8Len > 0) {
+				char* utf8Buffer = new char[utf8Len];
+				if (WideCharToMultiByte(CP_UTF8, 0, wideBuffer, -1, utf8Buffer, utf8Len, nullptr, nullptr) > 0) {
+					// Записываем без завершающего нуля (utf8Len включает нуль)
+					fwrite(utf8Buffer, 1, utf8Len - 1, fp);
+				}
+				delete[] utf8Buffer;
+			}
+			delete[] wideBuffer;
 		}
 
 		fclose(fp);
