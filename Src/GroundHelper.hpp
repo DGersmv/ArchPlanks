@@ -17,6 +17,9 @@ public:
     // Смещение по Z без mesh/TIN
     static bool ApplyZDelta(double deltaMeters);
 
+    // Установка абсолютной высоты относительно проектного 0
+    static bool ApplyAbsoluteZ(double absoluteZMeters);
+
     static bool DebugOneSelection();
 };
 

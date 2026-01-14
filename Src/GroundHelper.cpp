@@ -640,6 +640,50 @@ static void SetWorldZ_WithDelta(API_Element& e, double finalWorldZ, double delta
     }
 }
 
+// Установка абсолютной высоты (не меняет floorInd, только level относительно этажа)
+static void SetWorldZ_Absolute(API_Element& e, double absoluteWorldZ, API_Element& maskOut)
+{
+    ACAPI_ELEMENT_MASK_CLEAR(maskOut);
+    double floorZ = 0.0; GetStoryLevelZ(e.header.floorInd, floorZ);
+
+    switch (IdentifyLandable(e)) {
+    case LandableKind::Object: {
+        const double old = e.object.level;
+        e.object.level = absoluteWorldZ - floorZ;
+        ACAPI_ELEMENT_MASK_SET(maskOut, API_ObjectType, level);
+        Log("[SetZAbs:Object] old=%.6f new=%.6f (absZ=%.6f)", old, e.object.level, absoluteWorldZ);
+        break;
+    }
+    case LandableKind::Lamp: {
+        const double old = e.lamp.level;
+        e.lamp.level = absoluteWorldZ - floorZ;
+        ACAPI_ELEMENT_MASK_SET(maskOut, API_LampType, level);
+        Log("[SetZAbs:Lamp] old=%.6f new=%.6f (absZ=%.6f)", old, e.lamp.level, absoluteWorldZ);
+        break;
+    }
+    case LandableKind::Column: {
+        const double oldBot = e.column.bottomOffset;
+        const double oldTop = e.column.topOffset;
+        const double columnHeight = oldTop - oldBot; // сохраняем высоту колонны
+        e.column.bottomOffset = absoluteWorldZ - floorZ;
+        e.column.topOffset = e.column.bottomOffset + columnHeight; // сохранить высоту
+        ACAPI_ELEMENT_MASK_SET(maskOut, API_ColumnType, bottomOffset);
+        ACAPI_ELEMENT_MASK_SET(maskOut, API_ColumnType, topOffset);
+        Log("[SetZAbs:Column] bottom %.6f->%.6f, topOffset %.6f->%.6f (absZ=%.6f, height=%.6f)",
+            oldBot, e.column.bottomOffset, oldTop, e.column.topOffset, absoluteWorldZ, columnHeight);
+        break;
+    }
+    case LandableKind::Beam: {
+        const double old = e.beam.level;
+        e.beam.level = absoluteWorldZ - floorZ;
+        ACAPI_ELEMENT_MASK_SET(maskOut, API_BeamType, level);
+        Log("[SetZAbs:Beam] old=%.6f new=%.6f (absZ=%.6f)", old, e.beam.level, absoluteWorldZ);
+        break;
+    }
+    default: break;
+    }
+}
+
 // ================================================================
 // Public API
 // ================================================================
@@ -802,6 +846,40 @@ bool GroundHelper::ApplyZDelta(double deltaMeters)
         });
 
     Log("[ApplyZDelta] EXIT (err=%d)", (int)cmdErr);
+    return (cmdErr == NoError);
+}
+
+bool GroundHelper::ApplyAbsoluteZ(double absoluteZMeters)
+{
+    Log("[ApplyAbsoluteZ] ENTER absoluteZ=%.6f", absoluteZMeters);
+
+    // ВСЕГДА обновляем кэш из текущего выделения, чтобы использовать актуальные объекты
+    Log("[ApplyAbsoluteZ] updating cache from current selection");
+    if (!SetGroundObjects()) { 
+        Log("[ApplyAbsoluteZ] no objects in selection"); 
+        return false; 
+    }
+
+    const GSErr cmdErr = ACAPI_CallUndoableCommand("Set Absolute Z", [=]() -> GSErr {
+        for (const API_Guid& guid : g_objectGuids) {
+            API_Element e{}; if (!FetchElementByGuid(guid, e)) { Log("[absZ] fetch failed"); continue; }
+            if (IdentifyLandable(e) == LandableKind::Unsupported) { Log("[absZ] unsupported"); continue; }
+
+            const API_Coord3D anchor = GetWorldAnchor(e);
+            Log("[AbsZ] guid=%s oldZ=%.6f -> newZ=%.6f (absolute=%.6f)",
+                APIGuidToString(guid).ToCStr().Get(), anchor.z, absoluteZMeters, absoluteZMeters);
+
+            API_Element mask{};
+            SetWorldZ_Absolute(e, absoluteZMeters, mask);
+
+            const GSErr chg = ACAPI_Element_Change(&e, &mask, nullptr, 0, true);
+            if (chg == NoError) Log("[AbsZ] UPDATED %s", APIGuidToString(guid).ToCStr().Get());
+            else               Log("[AbsZ] Change FAILED err=%d %s", (int)chg, APIGuidToString(guid).ToCStr().Get());
+        }
+        return NoError;
+        });
+
+    Log("[ApplyAbsoluteZ] EXIT (err=%d)", (int)cmdErr);
     return (cmdErr == NoError);
 }
 

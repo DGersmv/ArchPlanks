@@ -184,6 +184,31 @@
       }
     }
 
+    async function applyAbsoluteZ() {
+      const applyFn = ensureACAPI('ApplyAbsoluteZ');
+      if (!applyFn) {
+        return;
+      }
+
+      const input = document.getElementById('groundAbsoluteZ');
+      const raw = input ? input.value.trim().replace(',', '.') : '';
+      const absoluteZmm = parseFloat(raw);
+      if (!Number.isFinite(absoluteZmm)) {
+        setInfo('Неверное значение абсолютной высоты.');
+        input?.focus();
+        return;
+      }
+
+      const absoluteZMeters = absoluteZmm / 1000.0;
+      setInfo('Установка абсолютной высоты ' + absoluteZmm + ' мм...');
+      try {
+        const ok = await applyFn(absoluteZMeters.toString());
+        setInfo(ok ? 'Абсолютная высота установлена: ' + absoluteZmm + ' мм.' : 'Не удалось установить абсолютную высоту.');
+      } catch (err) {
+        setInfo('Ошибка: ' + err);
+      }
+    }
+
     document.addEventListener('click', function (e) {
       const el = e.target.closest('[data-help-url]');
       if (!el) return;
@@ -212,6 +237,11 @@
         <input type="number" id="groundOffset" step="1" value="0">
         <button class="button-flat button-inline button-primary" onclick="applyZDelta()">ОК</button>
       </div>
+      <div class="form-row" style="margin-top: 8px;">
+        <label for="groundAbsoluteZ">Установить Z (мм):</label>
+        <input type="number" id="groundAbsoluteZ" step="1" value="0">
+        <button class="button-flat button-inline button-primary" onclick="applyAbsoluteZ()">ОК</button>
+      </div>
     </div>
 
     <div class="divider"></div>
@@ -220,7 +250,7 @@
       <div class="section-title">Привязка к сетке</div>
       <button class="button-flat button-full button-primary" onclick="landToMesh()">Привязать</button>
       <div id="info-ground" class="info-box">
-        Смещение сдвигает текущее выделение по оси Z. Команда «Привязать» работает, когда в выделении одновременно присутствуют 3D сетка и объекты.
+        Смещение сдвигает текущее выделение по оси Z относительно текущей высоты. Установка Z устанавливает абсолютную высоту относительно проектного 0. Команда «Привязать» работает, когда в выделении одновременно присутствуют 3D сетка и объекты.
       </div>
       <div class="controls-row">
         <span></span>

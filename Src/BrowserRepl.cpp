@@ -551,6 +551,14 @@ void BrowserRepl::RegisterACAPIJavaScriptObject(DG::Browser& targetBrowser)
 		return new JS::Value(ok);
 		}));
 
+	jsACAPI->AddItem(new JS::Function("ApplyAbsoluteZ", [](GS::Ref<JS::Base> param) {
+		const double absoluteZ = GetDoubleFromJs(param, 0.0);
+		// if (BrowserRepl::HasInstance())
+		//	BrowserRepl::GetInstance().LogToBrowser(GS::UniString::Printf("[JS] ApplyAbsoluteZ(%.6f m)", absoluteZ));
+		const bool ok = GroundHelper::ApplyAbsoluteZ(absoluteZ);
+		return new JS::Value(ok);
+		}));
+
 	// --- Ground API (посадка на Mesh) ---
 	jsACAPI->AddItem(new JS::Function("SetGroundSurface", [](GS::Ref<JS::Base>) {
 		// if (BrowserRepl::HasInstance()) BrowserRepl::GetInstance().LogToBrowser("[JS] SetGroundSurface()");
