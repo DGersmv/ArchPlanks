@@ -1,171 +1,42 @@
-﻿/* *****************************************************************************
+/* *****************************************************************************
 // Localizable resource description
 // ****************************************************************************/
 
 'STR#' 32000 "Add-on Name and Description" {
-/* [  1] */		"Landscape Helper AC29"
-/* [  2] */		"Landscape AC29 V2.0"
+/* [  1] */		"ArchPlanks AC29"
+/* [  2] */		"План распила и пиломатериалы"
 }
 
 'STR#' 32501 "Strings for the Menu" {
-/* [   ] */		"Ландшафт"
-/* [   ] */		"Landscape Helper"
+/* [   ] */		"ArchPlanks"
+/* [   ] */		"ArchPlanks"
 /* [  1] */		"Таблица выделенного"
-/* [  2] */		"Распределение по линиям"
-/* [  3] */		"Ориентация"
-/* [  4] */		"Поворот по поверхности"
-/* [  5] */		"Приземление"
-/* [  6] */		"Размеры установка"
-/* [  7] */		"ID & Слои организация"
-/* [  8] */		"Контуры по линиям"
-/* [  9] */		"3D Сетка по линиям"
-/* [ 10] */		"Отправка в Excel"
-/* [ 11] */		"Рандомайзер"
-/* [ 12] */		"Поддержка"
-/* [ 13] */		"Toolbar"
+/* [  2] */		"Поддержка"
+/* [  3] */		"Toolbar"
 }
 
 /* --- Dockable toolbar palette ----------------------------------------------*/
 
-'GDLG'  32500    Palette | leftCaption | noGrow   0   0  393  32  ""  {
-/* [  0] */ IconButton          3    1   30   30    32111									/* Close button */
-/* [  1] */ IconButton         33    1   30   30    32100									/* Table - Selection Details */
-/* [  2] */ IconButton         63    1   30   30    32101									/* Spline - Distribution */
-/* [  3] */ IconButton         93    1   30   30    32102									/* Rotate - Orientation */
-/* [  4] */ IconButton        123    1   30   30    32103									/* RotSurf - Angle */
-/* [  5] */ IconButton        153    1   30   30    32104									/* Land - Ground */
-/* [  6] */ IconButton        183    1   30   30    32105									/* Dims - Markup */
-/* [  7] */ IconButton        213    1   30   30    32106									/* Layers - ID & Layers */
-/* [  8] */ IconButton        243    1   30   30    32107									/* Contour */
-/* [  9] */ IconButton        273    1   30   30    32108									/* Mesh */
-/* [ 10] */ IconButton        303    1   30   30    32109									/* CSV - Send to Excel */
-/* [ 11] */ IconButton        333    1   30   30    32112									/* Randomizer */
-/* [ 12] */ IconButton        363    1   30   30    32110									/* Support - Help */
+'GDLG'  32500    Palette | leftCaption | noGrow   0   0  100  32  ""  {
+/* [  0] */ IconButton          3    1   30   30    32111									/* Close */
+/* [  1] */ IconButton         33    1   30   30    32100									/* Selection Details */
+/* [  2] */ IconButton         63    1   30   30    32110									/* Support */
 }
 
 'DLGH'  32500  DLG_32500_Browser_Repl {
 1	"Close"					IconButton_0
 2	"Selection Details"		IconButton_1
-3	"Distribution"			IconButton_2
-4	"Orientation"			IconButton_3
-5	"Angle"					IconButton_4
-6	"Ground"				IconButton_5
-7	"Markup"				IconButton_6
-8	"ID & Layers"			IconButton_7
-9	"Contour"				IconButton_8
-10	"Mesh"					IconButton_9
-11	"Send to Excel"		IconButton_10
-12	"Randomizer"			IconButton_11
-13	"Support"				IconButton_12
+3	"Support"				IconButton_2
 }
 
 /* --- Dockable browser palette: HELP ---------------------------------------*/
 
-'GDLG'  32510    Palette | topCaption | close | grow   0   0  900  700  "Help LandscapeHelper"  {
+'GDLG'  32510    Palette | topCaption | close | grow   0   0  900  700  "Help ArchPlanks"  {
 /* [  1] */ Browser         0   0  900  700
 }
 
 'DLGH'  32510  DLG_32510_Help_Browser {
 1   "Help Browser Control"     Browser_0
-}
-
-/* --- Dockable browser palette: DISTRIBUTION ---------------------------------------*/
-
-'GDLG'  32520    Palette | topCaption | close | grow   0   0  500  360  "Distribution"  {
-/* [  1] */ Browser         0   0  500  360
-}
-
-'DLGH'  32520  DLG_32520_Distribution_Browser {
-1   "Distribution Browser Control"     Browser_0
-}
-
-/* --- Dockable browser palette: ORIENTATION ---------------------------------------*/
-
-'GDLG'  32530    Palette | topCaption | close | grow   0   0  500  360  "Orientation"  {
-/* [  1] */ Browser         0   0  500  360
-}
-
-'DLGH'  32530  DLG_32530_Orientation_Browser {
-1   "Orientation Browser Control"     Browser_0
-}
-
-/* --- Dockable browser palette: GROUND ---------------------------------------*/
-
-'GDLG'  32540    Palette | topCaption | close | grow   0   0  520  380  "Grounding"  {
-/* [  1] */ Browser         0   0  520  380
-}
-
-'DLGH'  32540  DLG_32540_Ground_Browser {
-1   "Ground Browser Control"     Browser_0
-}
-
-/* --- Dockable browser palette: MARKUP ---------------------------------------*/
-
-'GDLG'  32550    Palette | topCaption | close | grow   0   0  520  380  "Markup"  {
-/* [  1] */ Browser         0   0  520  380
-}
-
-'DLGH'  32550  DLG_32550_Markup_Browser {
-1   "Markup Browser Control"     Browser_0
-}
-
-/* --- Dockable browser palette: CONTOURS ---------------------------------------*/
-
-'GDLG'  32560    Palette | topCaption | close | grow   0   0  520  380  "Contours"  {
-/* [  1] */ Browser         0   0  520  380
-}
-
-'DLGH'  32560  DLG_32560_Contour_Browser {
-1   "Contour Browser Control"     Browser_0
-}
-
-/* --- Dockable browser palette: MESH ---------------------------------------*/
-
-'GDLG'  32570    Palette | topCaption | close | grow   0   0  520  380  "Mesh"  {
-/* [  1] */ Browser         0   0  520  380
-}
-
-'DLGH'  32570  DLG_32570_Mesh_Browser {
-1   "Mesh Browser Control"     Browser_0
-}
-
-/* --- Dockable browser palette: ID & LAYERS ---------------------------------------*/
-
-'GDLG'  32580    Palette | topCaption | close | grow   0   0  520  380  "ID & Layers"  {
-/* [  1] */ Browser         0   0  520  380
-}
-
-'DLGH'  32580  DLG_32580_IdLayers_Browser {
-1   "IDLayers Browser Control"     Browser_0
-}
-
-/* --- Dockable browser palette: ANGLE ---------------------------------------*/
-
-'GDLG'  32590    Palette | topCaption | close | grow   0   0  520  380  "Angle"  {
-/* [  1] */ Browser         0   0  520  380
-}
-
-'DLGH'  32590  DLG_32590_Angle_Browser {
-1   "Angle Browser Control"     Browser_0
-}
-
-/* --- Dockable browser palette: SEND TO EXCEL ---------------------------------------*/
-
-'GDLG'  32600    Palette | topCaption | close | grow   0   0  520  420  "Send to Excel"  {
-/* [  1] */ Browser         0   0  520  420
-}
-
-'DLGH'  32600  DLG_32600_SendXls_Browser {
-1   "SendXls Browser Control"     Browser_0
-}
-
-/* --- Dockable browser palette: RANDOMIZER ---------------------------------------*/
-'GDLG'  32620    Palette | topCaption | close | grow   0   0  520  420  "Randomizer"  {
-/* [  1] */ Browser         0   0  520  420
-}
-
-'DLGH'  32620  DLG_32620_Randomizer_Browser {
-1   "Randomizer Browser Control"     Browser_0
 }
 
 /* --- Dockable browser palette: SELECTION DETAILS ---------------------------------------*/

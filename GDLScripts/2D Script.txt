@@ -1,0 +1,106 @@
+! =========================================
+! 2D CUT SCHEME — План распила доски
+! Используем числовые параметры cut1, cut2, ... cut50
+! (вместо строки — SPLIT требует константы в GDL)
+! Плагин заполняет: cut1=1200, cut2=800, cut3=0 (0=конец)
+! =========================================
+
+eps = 0.001
+
+IF boardL <= eps THEN
+    END
+ENDIF
+
+IF boardW <= eps THEN
+    END
+ENDIF
+
+DEFINE STYLE "t1" "Arial", 2.5, 0
+SET STYLE "t1"
+
+! ---- Текст количества слева ----
+PEN penOutline
+TEXT2 -leftTextGap, boardW / 2, "Кол-во: " + STR(qtyVal, 4, 0)
+
+! ---- Внешний контур доски ----
+PEN penOutline
+RECT2 0, 0, boardL, boardW
+
+! ---- Отрисовка пропилов по параметрам cut1..cut50 ----
+x = 0
+FOR i = 1 TO 50
+    ! Берём значение через массив или отдельные параметры
+    ! Используем условную логику для cut1..cut10 (расширяем при необходимости)
+    segLen = 0
+    IF i = 1 THEN segLen = cut1
+    IF i = 2 THEN segLen = cut2
+    IF i = 3 THEN segLen = cut3
+    IF i = 4 THEN segLen = cut4
+    IF i = 5 THEN segLen = cut5
+    IF i = 6 THEN segLen = cut6
+    IF i = 7 THEN segLen = cut7
+    IF i = 8 THEN segLen = cut8
+    IF i = 9 THEN segLen = cut9
+    IF i = 10 THEN segLen = cut10
+    IF i = 11 THEN segLen = cut11
+    IF i = 12 THEN segLen = cut12
+    IF i = 13 THEN segLen = cut13
+    IF i = 14 THEN segLen = cut14
+    IF i = 15 THEN segLen = cut15
+    IF i = 16 THEN segLen = cut16
+    IF i = 17 THEN segLen = cut17
+    IF i = 18 THEN segLen = cut18
+    IF i = 19 THEN segLen = cut19
+    IF i = 20 THEN segLen = cut20
+
+    IF segLen <= eps THEN
+        GOTO 100
+    ENDIF
+
+    ! Прямоугольник сегмента
+    PEN penCut
+    RECT2 x, 0, x + segLen, boardW
+
+    IF showLengths = 1 THEN
+        TEXT2 x + segLen / 2, boardW / 2, STR(segLen, 6, 0)
+    ENDIF
+
+    x = x + segLen
+
+    ! Пропил (kerf) — проверим, есть ли следующий ненулевой
+    nextLen = 0
+    IF i = 1 THEN nextLen = cut2
+    IF i = 2 THEN nextLen = cut3
+    IF i = 3 THEN nextLen = cut4
+    IF i = 4 THEN nextLen = cut5
+    IF i = 5 THEN nextLen = cut6
+    IF i = 6 THEN nextLen = cut7
+    IF i = 7 THEN nextLen = cut8
+    IF i = 8 THEN nextLen = cut9
+    IF i = 9 THEN nextLen = cut10
+    IF i = 10 THEN nextLen = cut11
+    IF i = 11 THEN nextLen = cut12
+    IF i = 12 THEN nextLen = cut13
+    IF i = 13 THEN nextLen = cut14
+    IF i = 14 THEN nextLen = cut15
+    IF i = 15 THEN nextLen = cut16
+    IF i = 16 THEN nextLen = cut17
+    IF i = 17 THEN nextLen = cut18
+    IF i = 18 THEN nextLen = cut19
+    IF i = 19 THEN nextLen = cut20
+
+    IF nextLen > eps AND kerfWidth > eps THEN
+        IF kerfFill <> 0 THEN
+            SET FILL kerfFill
+        ENDIF
+        PEN penKerf
+        RECT2 x, 0, x + kerfWidth, boardW
+        IF kerfFill <> 0 THEN
+            SET FILL 0
+        ENDIF
+        x = x + kerfWidth
+    ENDIF
+NEXT i
+
+100:
+END

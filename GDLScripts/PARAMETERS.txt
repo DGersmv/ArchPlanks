@@ -1,0 +1,17 @@
+! =========================================
+! Параметры объекта "План распила" — добавить в Object Editor
+! =========================================
+
+boardL          LENGTH   Длина доски (мм)
+boardW          LENGTH   Ширина доски (мм)
+qtyVal          INTEGER  Количество
+leftTextGap     LENGTH   Отступ текста слева
+penOutline      INTEGER  Перо контура
+penCut          INTEGER  Перо сегментов
+penKerf         INTEGER  Перо пропилов
+showLengths     INTEGER  1=показывать размеры
+kerfWidth       LENGTH   Ширина пропила (мм)
+kerfFill        INTEGER  Заливка пропила (0=нет)
+
+! Сегменты распила (0 = конец списка):
+cut1..cut20     LENGTH   Длина отрезка 1..20

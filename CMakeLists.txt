@@ -271,4 +271,3 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang\$")
 else()
     message(FATAL_ERROR "Unknown compiler ID.")
 endif()
-

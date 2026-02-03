@@ -1,4 +1,4 @@
-﻿/* *****************************************************************************
+/* *****************************************************************************
 // Non-localizable resource description
 // ****************************************************************************/
 
@@ -6,100 +6,20 @@
 
 'MDID' 32500 "Add-On Identifier" {
 	909404777
-	601968829_LandscapeHelperInt
+	914706856_ArchPlanks
 }
 
 'DATA' 100 "Browser Control Html" {
 	"Selection_Test.html"
 }
 
-'DATA' 110 "Distribution Palette Html" {
-	"Distribution_Palette.html"
-}
-
-'DATA' 120 "Orientation Palette Html" {
-	"Orientation_Palette.html"
-}
-
-'DATA' 130 "Ground Palette Html" {
-	"Ground_Palette.html"
-}
-
-'DATA' 140 "Markup Palette Html" {
-	"Markup_Palette.html"
-}
-
-'DATA' 150 "Contour Palette Html" {
-	"Contour_Palette.html"
-}
-
-'DATA' 160 "Mesh Palette Html" {
-	"Mesh_Palette.html"
-}
-
-'DATA' 170 "IdLayers Palette Html" {
-	"IdLayers_Palette.html"
-}
-
-'DATA' 180 "Angle Palette Html" {
-	"Angle_Palette.html"
-}
-
-'DATA' 190 "Send to Excel Palette Html" {
-	"Send_Xls_Palette.html"
-}
-
 'DATA' 200 "Selection Details Palette Html" {
 	"Selection_Details_Palette.html"
-}
-
-'DATA' 210 "Randomizer Palette Html" {
-	"Randomizer_Palette.html"
 }
 
 /* Icons for native toolbar buttons */
 'GICN' 32100 "Table Icon" {
 	"Table"
-}
-
-'GICN' 32101 "Spline Icon" {
-	"Spline"
-}
-
-'GICN' 32102 "Rotate Icon" {
-	"Rotate"
-}
-
-'GICN' 32103 "RotSurf Icon" {
-	"RotSurf"
-}
-
-'GICN' 32104 "Land Icon" {
-	"Land"
-}
-
-'GICN' 32105 "Dims Icon" {
-	"Dims"
-}
-
-'GICN' 32106 "Layers Icon" {
-	"Layers"
-}
-
-'GICN' 32107 "Contour Icon" {
-	"Contour"
-}
-
-'GICN' 32108 "Mesh Icon" {
-	"Mesh"
-}
-
-'GICN' 32109 "CSV Icon" {
-	"CSV"
-}
-
-'GICN' 32112 "Randomizer Icon" {
-	"Random"
 }
 
 'GICN' 32110 "Support Icon" {
