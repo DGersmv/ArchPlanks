@@ -12,11 +12,9 @@ extern "C" {
 	bool IsLicenseValid();
 	bool IsDemoExpired();
 }
-#include "HelpPalette.hpp"
 #include "SelectionPropertyHelper.hpp"
 #include "SelectionMetricsHelper.hpp"
 #include "SelectionDetailsPalette.hpp"
-#include "SendXlsPalette.hpp"
 
 #include <commdlg.h>
 #include <cmath>
@@ -229,7 +227,6 @@ BrowserRepl::BrowserRepl() :
 	DG::Palette(ACAPI_GetOwnResModule(), BrowserReplResId, ACAPI_GetOwnResModule(), paletteGuid),
 	buttonClose(GetReference(), ToolbarButtonCloseId),
 	buttonTable(GetReference(), ToolbarButtonTableId),
-	buttonExcel(GetReference(), ToolbarButtonExcelId),
 	buttonSupport(GetReference(), ToolbarButtonSupportId)
 {
 #ifdef DEBUG_UI_LOGS
@@ -417,17 +414,12 @@ void BrowserRepl::RegisterACAPIJavaScriptObject(DG::Browser& targetBrowser)
 			if (v->GetType() == JS::Value::STRING) url = v->GetString();
 		}
 		if (url.IsEmpty()) url = "https://landscape.227.info/help/start";
-		HelpPalette::ShowWithURL(url);
+		ShellExecuteW(NULL, L"open", url.ToUStr().Get(), NULL, NULL, SW_SHOWNORMAL);
 		return new JS::Value(true);
 		}));
 
 	jsACAPI->AddItem(new JS::Function("OpenSelectionDetailsPalette", [](GS::Ref<JS::Base>) {
 		SelectionDetailsPalette::ShowPalette();
-		return new JS::Value(true);
-		}));
-
-	jsACAPI->AddItem(new JS::Function("OpenSendXlsPalette", [](GS::Ref<JS::Base>) {
-		SendXlsPalette::ShowPalette();
 		return new JS::Value(true);
 		}));
 
@@ -485,13 +477,10 @@ void BrowserRepl::ButtonClicked(const DG::ButtonClickEvent& ev)
 		case ToolbarButtonTableId:
 			SelectionDetailsPalette::ShowPalette();
 			break;
-		case ToolbarButtonExcelId:
-			SendXlsPalette::ShowPalette();
-			break;
 		case ToolbarButtonSupportId:
 			{
 				GS::UniString url = LicenseManager::BuildLicenseUrl();
-				HelpPalette::ShowWithURL(url);
+				ShellExecuteW(NULL, L"open", url.ToUStr().Get(), NULL, NULL, SW_SHOWNORMAL);
 			}
 			break;
 		default:
