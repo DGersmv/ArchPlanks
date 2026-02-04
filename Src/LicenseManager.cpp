@@ -371,11 +371,13 @@ LicenseManager::LicenseStatus LicenseManager::CheckLicense(LicenseData& licenseD
 		return LicenseStatus::ComputerMismatch;
 	}
 
-	// Проверяем название плагина (ожидаем LandscapeHelper_AC29 или Browser_Repl_Int)
-	GS::UniString expectedPluginName1 = GS::UniString("LandscapeHelper_AC29");
-	GS::UniString expectedPluginName2 = GS::UniString("Browser_Repl_Int");
+	// Проверяем название плагина (ожидаем ArchPlanks_AC29, LandscapeHelper_AC29 или Browser_Repl_Int)
+	GS::UniString expectedPluginName1 = GS::UniString("ArchPlanks_AC29");
+	GS::UniString expectedPluginName2 = GS::UniString("LandscapeHelper_AC29");
+	GS::UniString expectedPluginName3 = GS::UniString("Browser_Repl_Int");
 	if (licenseData.pluginName != expectedPluginName1 && 
-		licenseData.pluginName != expectedPluginName2) {
+		licenseData.pluginName != expectedPluginName2 &&
+		licenseData.pluginName != expectedPluginName3) {
 		WriteLicenseLog(LicenseStatus::PluginMismatch, licenseData);
 		return LicenseStatus::PluginMismatch;
 	}

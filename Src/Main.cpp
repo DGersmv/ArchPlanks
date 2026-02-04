@@ -2,12 +2,16 @@
 // Source code for ArchPlanks Add-On (Cutting Plan)
 // *****************************************************************************
 
+// Временно отключить проверку лицензии для тестов. Перед релизом поставить 0.
+#define SKIP_LICENSE_FOR_TESTS 1
+
 #include	"APIEnvir.h"
 #include	"ACAPinc.h"
 #include	"ResourceIDs.hpp"
 #include	"BrowserRepl.hpp"
 #include	"HelpPalette.hpp"
 #include	"SelectionDetailsPalette.hpp"
+#include	"SendXlsPalette.hpp"
 #include	"LicenseManager.hpp"
 #include	"APICommon.h"
 
@@ -97,6 +101,10 @@ GSErrCode	RegisterInterface (void)
 
 GSErrCode Initialize ()
 {
+#if SKIP_LICENSE_FOR_TESTS
+	g_isLicenseValid = true;
+	g_isDemoExpired = false;
+#else
 	LicenseManager::LicenseData licenseData;
 	LicenseManager::LicenseStatus licenseStatus = LicenseManager::CheckLicense(licenseData);
 	
@@ -121,6 +129,7 @@ GSErrCode Initialize ()
 		ACAPI_WriteReport("Demo period expired. Please purchase a license. Support: ", false);
 		ACAPI_WriteReport(supportUrl.ToCStr().Get(), false);
 	}
+#endif
 
 	GSErrCode err = ACAPI_MenuItem_InstallMenuHandler (BrowserReplMenuResId, MenuCommandHandler);
 	if (DBERROR (err != NoError))
@@ -130,6 +139,7 @@ GSErrCode Initialize ()
 	palErr |= BrowserRepl::RegisterPaletteControlCallBack ();
 	palErr |= HelpPalette::RegisterPaletteControlCallBack ();
 	palErr |= SelectionDetailsPalette::RegisterPaletteControlCallBack ();
+	palErr |= SendXlsPalette::RegisterPaletteControlCallBack ();
 
 	if (DBERROR (palErr != NoError))
 		return palErr;

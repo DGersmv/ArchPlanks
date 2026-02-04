@@ -8,7 +8,7 @@
 }
 
 'STR#' 32501 "Strings for the Menu" {
-/* [   ] */		"ArchPlanks"
+/* [   ] */		"227.info"
 /* [   ] */		"ArchPlanks"
 /* [  1] */		"Таблица выделенного"
 /* [  2] */		"Поддержка"
@@ -17,16 +17,18 @@
 
 /* --- Dockable toolbar palette ----------------------------------------------*/
 
-'GDLG'  32500    Palette | leftCaption | noGrow   0   0  100  32  ""  {
+'GDLG'  32500    Palette | leftCaption | noGrow   0   0  130  32  ""  {
 /* [  0] */ IconButton          3    1   30   30    32111									/* Close */
 /* [  1] */ IconButton         33    1   30   30    32100									/* Selection Details */
-/* [  2] */ IconButton         63    1   30   30    32110									/* Support */
+/* [  2] */ IconButton         63    1   30   30    32112									/* Excel */
+/* [  3] */ IconButton         93    1   30   30    32110									/* Support */
 }
 
 'DLGH'  32500  DLG_32500_Browser_Repl {
 1	"Close"					IconButton_0
 2	"Selection Details"		IconButton_1
-3	"Support"				IconButton_2
+3	"Отправить в Excel"		IconButton_2
+4	"Support"				IconButton_3
 }
 
 /* --- Dockable browser palette: HELP ---------------------------------------*/
@@ -47,4 +49,14 @@
 
 'DLGH'  32610  DLG_32610_SelectionDetails_Browser {
 1   "SelectionDetails Browser Control"     Browser_0
+}
+
+/* --- Dockable browser palette: SEND XLS (Excel export) ---------------------------------------*/
+
+'GDLG'  32620    Palette | topCaption | close | grow   0   0  500  600  "Отправка в Excel"  {
+/* [  1] */ Browser         0   0  500  600
+}
+
+'DLGH'  32620  DLG_32620_SendXls_Browser {
+1   "SendXls Browser Control"     Browser_0
 }

@@ -16,15 +16,16 @@ extern "C" {
 #include "SelectionPropertyHelper.hpp"
 #include "SelectionMetricsHelper.hpp"
 #include "SelectionDetailsPalette.hpp"
+#include "SendXlsPalette.hpp"
 
-
-
+#include <commdlg.h>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <vector>
 
 // --------------------- Palette GUID / Instance ---------------------
-static const GS::Guid paletteGuid("{11bd981d-f772-4a57-8709-42e18733a0cc}");
+static const GS::Guid paletteGuid("{22a3b4c5-6d7e-8f9a-0b1c-2d3e4f5a6b7c}");
 GS::Ref<BrowserRepl> BrowserRepl::instance;
 
 // HTML/JavaScript helpers removed - using native buttons now
@@ -97,6 +98,48 @@ static GS::UniString GetStringFromJavaScriptVariable(GS::Ref<JS::Base> jsVariabl
 	if (DBVERIFY(jsValue != nullptr && jsValue->GetType() == JS::Value::STRING))
 		return jsValue->GetString();
 	return GS::EmptyUniString;
+}
+
+// --- Save CSV with Windows Save dialog (UTF-8 with BOM) ---
+static bool SaveCsvWithDialog(const GS::UniString& csvContent)
+{
+	wchar_t pathBuf[MAX_PATH] = L"";
+	OPENFILENAMEW ofn = {};
+	ofn.lStructSize = sizeof(ofn);
+	ofn.lpstrFilter = L"CSV files (*.csv)\0*.csv\0All files (*.*)\0*.*\0";
+	ofn.lpstrFile = pathBuf;
+	ofn.nMaxFile = MAX_PATH;
+	ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
+	ofn.lpstrDefExt = L"csv";
+	if (!GetSaveFileNameW(&ofn))
+		return false;
+
+	FILE* fp = _wfopen(pathBuf, L"wb");
+	if (!fp)
+		return false;
+
+	// UTF-8 BOM
+	const unsigned char bom[] = { 0xEF, 0xBB, 0xBF };
+	if (fwrite(bom, 1, 3, fp) != 3) {
+		fclose(fp);
+		return false;
+	}
+
+	const int wideLen = (int)csvContent.GetLength();
+	if (wideLen > 0) {
+		const wchar_t* wstr = csvContent.ToUStr().Get();
+		int utf8Size = WideCharToMultiByte(CP_UTF8, 0, wstr, wideLen, NULL, 0, NULL, NULL);
+		if (utf8Size > 0) {
+			std::vector<char> buf((size_t)utf8Size);
+			WideCharToMultiByte(CP_UTF8, 0, wstr, wideLen, buf.data(), utf8Size, NULL, NULL);
+			if (fwrite(buf.data(), 1, (size_t)utf8Size, fp) != (size_t)utf8Size) {
+				fclose(fp);
+				return false;
+			}
+		}
+	}
+	fclose(fp);
+	return true;
 }
 
 // --- Extract array of strings (GUIDs) from JS::Base ---
@@ -186,6 +229,7 @@ BrowserRepl::BrowserRepl() :
 	DG::Palette(ACAPI_GetOwnResModule(), BrowserReplResId, ACAPI_GetOwnResModule(), paletteGuid),
 	buttonClose(GetReference(), ToolbarButtonCloseId),
 	buttonTable(GetReference(), ToolbarButtonTableId),
+	buttonExcel(GetReference(), ToolbarButtonExcelId),
 	buttonSupport(GetReference(), ToolbarButtonSupportId)
 {
 #ifdef DEBUG_UI_LOGS
@@ -382,6 +426,19 @@ void BrowserRepl::RegisterACAPIJavaScriptObject(DG::Browser& targetBrowser)
 		return new JS::Value(true);
 		}));
 
+	jsACAPI->AddItem(new JS::Function("OpenSendXlsPalette", [](GS::Ref<JS::Base>) {
+		SendXlsPalette::ShowPalette();
+		return new JS::Value(true);
+		}));
+
+	jsACAPI->AddItem(new JS::Function("SaveSendXls", [](GS::Ref<JS::Base> param) -> GS::Ref<JS::Base> {
+		GS::UniString csv = GetStringFromJavaScriptVariable(param);
+		bool ok = SaveCsvWithDialog(csv);
+		if (ok)
+			ACAPI_WriteReport("CSV exported successfully.", false);
+		return new JS::Value(ok);
+		}));
+
 	jsACAPI->AddItem(new JS::Function("ClosePalette", [](GS::Ref<JS::Base>) {
 		if (BrowserRepl::HasInstance() && BrowserRepl::GetInstance().IsVisible())
 			BrowserRepl::GetInstance().Hide();
@@ -427,6 +484,9 @@ void BrowserRepl::ButtonClicked(const DG::ButtonClickEvent& ev)
 			break;
 		case ToolbarButtonTableId:
 			SelectionDetailsPalette::ShowPalette();
+			break;
+		case ToolbarButtonExcelId:
+			SendXlsPalette::ShowPalette();
 			break;
 		case ToolbarButtonSupportId:
 			{

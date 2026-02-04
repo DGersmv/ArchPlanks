@@ -17,6 +17,10 @@
 	"Selection_Details_Palette.html"
 }
 
+'DATA' 300 "Send Xls Palette Html" {
+	"Send_Xls_Palette.html"
+}
+
 /* Icons for native toolbar buttons */
 'GICN' 32100 "Table Icon" {
 	"Table"
@@ -28,4 +32,8 @@
 
 'GICN' 32111 "Close Icon" {
 	"Close"
+}
+
+'GICN' 32112 "Excel Icon" {
+	"CSV"
 }

@@ -8,7 +8,7 @@ function (SetCompilerOptions target)
 	target_compile_features (${target} PUBLIC cxx_std_20)
 	target_compile_options (${target} PUBLIC "$<$<CONFIG:Debug>:-DDEBUG>")
 	if (WIN32)
-		target_compile_options (${target} PUBLIC /W3 /WX /wd4996 /Zc:wchar_t-)
+		target_compile_options (${target} PUBLIC /W3 /WX /wd4996 /Zc:wchar_t- /EHsc)
 	else ()
 		target_compile_options (${target} PUBLIC -Wall -Werror -fvisibility=hidden
 			-Wno-multichar
@@ -182,10 +182,10 @@ if (WIN32)
 	
 	# Имена бинарников по конфигурациям:
 	#    Debug   → ${AC_ADDON_NAME}    (из имени папки)
-	#    Release → LandscapeHelper_AC29
+	#    Release → ArchPlanks_AC29
 	set_target_properties (AddOn PROPERTIES
 		OUTPUT_NAME_DEBUG         "${AC_ADDON_NAME}"
-		OUTPUT_NAME_RELEASE       "LandscapeHelper_AC29"
+		OUTPUT_NAME_RELEASE       "ArchPlanks_AC29"
 		OUTPUT_NAME_RELWITHDEBINFO "${AC_ADDON_NAME}"
 		SUFFIX ".apx"
 	)
@@ -195,10 +195,10 @@ if (WIN32)
 		PDB_OUTPUT_DIRECTORY             "${CMAKE_SOURCE_DIR}/ToArchicad/$<CONFIG>"
 		COMPILE_PDB_OUTPUT_DIRECTORY     "${CMAKE_SOURCE_DIR}/ToArchicad/$<CONFIG>"
 		PDB_NAME_DEBUG                   "${AC_ADDON_NAME}"
-		PDB_NAME_RELEASE                 "LandscapeHelper_AC29"
+		PDB_NAME_RELEASE                 "ArchPlanks_AC29"
 		PDB_NAME_RELWITHDEBINFO          "${AC_ADDON_NAME}"
 		COMPILE_PDB_NAME_DEBUG           "${AC_ADDON_NAME}"
-		COMPILE_PDB_NAME_RELEASE         "LandscapeHelper_AC29"
+		COMPILE_PDB_NAME_RELEASE         "ArchPlanks_AC29"
 		COMPILE_PDB_NAME_RELWITHDEBINFO  "${AC_ADDON_NAME}"
 	)
 else ()

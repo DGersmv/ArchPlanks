@@ -34,6 +34,7 @@ private:
     
     DG::IconButton buttonClose;
     DG::IconButton buttonTable;
+    DG::IconButton buttonExcel;
     DG::IconButton buttonSupport;
 
     void SetMenuItemCheckedState(bool isChecked);

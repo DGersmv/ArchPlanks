@@ -67,7 +67,7 @@ static GSErrCode SelectionDetailsPaletteCallback(Int32 /*refCon*/, API_PaletteMe
 
 // -------------------- static members --------------------
 GS::Ref<SelectionDetailsPalette> SelectionDetailsPalette::s_instance(nullptr);
-const GS::Guid SelectionDetailsPalette::s_guid("{a1b2c3d4-5e6f-7a8b-9c0d-1e2f3a4b5c6d}");
+const GS::Guid SelectionDetailsPalette::s_guid("{33b4c5d6-7e8f-9a0b-1c2d-3e4f5a6b7c8d}");
 
 // -------------------- lifecycle --------------------
 SelectionDetailsPalette::SelectionDetailsPalette()

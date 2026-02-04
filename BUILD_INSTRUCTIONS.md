@@ -7,7 +7,7 @@
 
 ### Шаг 2: Перейдите в папку проекта
 ```bash
-cd "C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\Browser_Repl_Int"
+cd "C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks"
 ```
 **В офисе замените на ваш путь!**
 
@@ -22,7 +22,7 @@ cmake --build build --config Debug
 ```
 
 ### Шаг 5: Готово!
-Файл будет здесь: `ToArchicad\Debug\Browser_Repl_Int.apx` (Debug) или `ToArchicad\Release\LandscapeHelper_AC29.apx` (Release)
+Файл будет здесь: `ToArchicad\Debug\ArchPlanks.apx` (Debug) или `ToArchicad\Release\ArchPlanks_AC29.apx` (Release)
 
 ---
 
@@ -33,7 +33,7 @@ cmake --build build --config Debug
 
 ### Шаг 2: Перейдите в папку проекта
 ```bash
-cd "C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\Browser_Repl_Int"
+cd "C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks"
 ```
 **В офисе замените на ваш путь!**
 
@@ -48,7 +48,7 @@ cmake --build build --config Release
 ```
 
 ### Шаг 5: Готово!
-Файл будет здесь: `ToArchicad\Release\LandscapeHelper_AC29.apx`
+Файл будет здесь: `ToArchicad\Release\ArchPlanks_AC29.apx`
 
 ---
 
@@ -74,7 +74,7 @@ cmake --build build --config Release
 
 Если у вас другая структура папок, используйте:
 ```bash
-cd "ВАШ_ПУТЬ\Browser_Repl_Int"
+cd "ВАШ_ПУТЬ\ArchPlanks"
 cmake -S . -B build -DAC_API_DEVKIT_DIR="ПОЛНЫЙ_ПУТЬ_К_DEVKIT"
 cmake --build build --config Release
 ```

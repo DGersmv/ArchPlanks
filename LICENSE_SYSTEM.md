@@ -12,7 +12,7 @@
 
 ```
 COMPUTER_ID=XX-XX-XX-XX-XX-XX
-PLUGIN_NAME=LandscapeHelper_AC29
+PLUGIN_NAME=ArchPlanks_AC29
 PLUGIN_VERSION=1.0.0
 VALID_UNTIL=2025-12-31
 ISSUED_DATE=2024-01-15
@@ -22,7 +22,7 @@ LICENSE_KEY=XXXX-XXXX-XXXX-XXXX
 ### Параметры:
 
 - **COMPUTER_ID** - MAC адрес сетевой карты компьютера (формат: XX-XX-XX-XX-XX-XX)
-- **PLUGIN_NAME** - Название плагина (должно быть `LandscapeHelper_AC29` или `Browser_Repl_Int`)
+- **PLUGIN_NAME** - Название плагина (должно быть `ArchPlanks_AC29`, `LandscapeHelper_AC29` или `Browser_Repl_Int`)
 - **PLUGIN_VERSION** - Версия плагина (опционально, для информации)
 - **VALID_UNTIL** - Дата окончания действия лицензии (формат: YYYY-MM-DD)
 - **ISSUED_DATE** - Дата выдачи лицензии (формат: YYYY-MM-DD, опционально)
@@ -83,9 +83,9 @@ LICENSE_KEY=XXXX-XXXX-XXXX-XXXX
 ```
 ToArchicad/
   Release/
-    LandscapeHelper_AC29.apx    <- файл плагина
-    LandscapeHelper_AC29.lic     <- файл лицензии (должен быть здесь)
-    LandscapeHelper_AC29.log     <- лог проверки (создается автоматически)
+    ArchPlanks_AC29.apx    <- файл плагина
+    ArchPlanks_AC29.lic     <- файл лицензии (должен быть здесь)
+    ArchPlanks_AC29.log     <- лог проверки (создается автоматически)
 ```
 
 ## Технические детали
