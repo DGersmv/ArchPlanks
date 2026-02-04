@@ -11,9 +11,12 @@
 #include	"BrowserRepl.hpp"
 #include	"SelectionDetailsPalette.hpp"
 #include	"LicenseManager.hpp"
+#include	"CutPlanBoardHelper.hpp"
+#include	"CuttingStockSolver.hpp"
 #include	"APICommon.h"
 
 #include <Windows.h>
+#include <shellapi.h>
 
 // -----------------------------------------------------------------------------
 // Show or Hide Browser Palette

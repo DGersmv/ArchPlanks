@@ -3,8 +3,10 @@
 #include "BrowserRepl.hpp"
 #include "DGBrowser.hpp"
 #include "LicenseManager.hpp"
+#include "CutPlanBoardHelper.hpp"
 
 #include <Windows.h>
+#include <shellapi.h>
 #include "SelectionHelper.hpp"
 
 // Внешние функции для проверки состояния лицензии
@@ -405,6 +407,75 @@ void BrowserRepl::RegisterACAPIJavaScriptObject(DG::Browser& targetBrowser)
 			jsMetrics->AddItem(obj);
 		}
 		return jsMetrics;
+	}));
+
+	// --- ArchiFramePlank summary & Cutting Plan ---
+	jsACAPI->AddItem(new JS::Function("GetArchiFramePlankSummary", [](GS::Ref<JS::Base>) {
+		GS::Array<CutPlanBoardHelper::ArchiFrameSummaryRow> rows = CutPlanBoardHelper::CollectArchiFrameSummaryFromSelection();
+		GS::Ref<JS::Array> jsRows = new JS::Array();
+
+		for (const auto& row : rows) {
+			GS::Ref<JS::Object> obj = new JS::Object();
+			obj->AddItem("materialLabel", new JS::Value(row.materialLabel));
+			obj->AddItem("widthMM", new JS::Value(row.widthMM));
+			obj->AddItem("heightMM", new JS::Value(row.heightMM));
+			obj->AddItem("count", new JS::Value((Int32)row.count));
+
+			GS::Ref<JS::Array> jsGuids = new JS::Array();
+			for (const GS::UniString& g : row.guidStrs) {
+				jsGuids->AddItem(new JS::Value(g));
+			}
+			obj->AddItem("guids", jsGuids);
+
+			jsRows->AddItem(obj);
+		}
+
+		return jsRows;
+	}));
+
+	jsACAPI->AddItem(new JS::Function("GetFloors", [](GS::Ref<JS::Base>) {
+		GS::Ref<JS::Array> jsFloors = new JS::Array();
+
+		API_StoryInfo storyInfo = {};
+		const GSErrCode err = ACAPI_ProjectSetting_GetStorySettings(&storyInfo);
+		if (err == NoError && storyInfo.data != nullptr) {
+			for (short floorInd = storyInfo.firstStory; floorInd <= storyInfo.lastStory; ++floorInd) {
+				const Int32 idx = floorInd - storyInfo.firstStory;
+				const API_StoryType& s = (*storyInfo.data)[idx];
+
+				GS::Ref<JS::Object> obj = new JS::Object();
+				obj->AddItem("index", new JS::Value((Int32)floorInd));
+				obj->AddItem("name", new JS::Value(GS::UniString(s.uName)));
+				obj->AddItem("elevation", new JS::Value(s.level));
+				jsFloors->AddItem(obj);
+			}
+		}
+
+		if (storyInfo.data != nullptr) {
+			BMKillHandle(reinterpret_cast<GSHandle*>(&storyInfo.data));
+		}
+
+		return jsFloors;
+	}));
+
+	jsACAPI->AddItem(new JS::Function("RunCuttingPlan", [](GS::Ref<JS::Base> param) {
+		double slitMM = 0.0;
+		short floorInd = 0;
+
+		if (param != nullptr) {
+			if (GS::Ref<JS::Array> arr = GS::DynamicCast<JS::Array>(param)) {
+				const GS::Array<GS::Ref<JS::Base>>& items = arr->GetItemArray();
+				if (items.GetSize() > 0)
+					slitMM = GetDoubleFromJs(items[0], 0.0);
+				if (items.GetSize() > 1)
+					floorInd = static_cast<short>(GetIntFromJs(items[1], 0));
+			} else {
+				slitMM = GetDoubleFromJs(param, 0.0);
+			}
+		}
+
+		const bool ok = CutPlanBoardHelper::RunCuttingPlan(slitMM, floorInd);
+		return new JS::Value(ok);
 	}));
 
 	// --- Help / Palettes ---

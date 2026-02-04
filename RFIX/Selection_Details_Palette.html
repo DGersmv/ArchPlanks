@@ -289,40 +289,37 @@
 
     function UpdateSelectedElements() {
       const A = window.ACAPI;
-      if (!A || typeof A.GetSelectedElements !== 'function') {
+      if (!A || typeof A.GetArchiFramePlankSummary !== 'function') {
         return;
       }
-      A.GetSelectedElements().then(function (elemInfos) {
+      A.GetArchiFramePlankSummary().then(function (summaryRows) {
         const selectionTable = document.getElementById('selection');
         
-        // Формируем структуру groupKey -> Array<GUID>
         groupDataMap = {};
-        if (elemInfos && elemInfos.length > 0) {
-          for (let i = 0; i < elemInfos.length; i++) {
-            const guidStr   = elemInfos[i][0];
-            const typeName  = elemInfos[i][1];
-            const elemID    = elemInfos[i][2];
-            const layerName = elemInfos[i][3] || 'Unknown';
-            
-            const groupKey = typeName + "||" + elemID + "||" + layerName;
-            if (!groupDataMap[groupKey]) {
-              groupDataMap[groupKey] = {
-                guids: [],
-                type: typeName,
-                id: elemID,
-                layer: layerName,
-                count: 0
-              };
-            }
-            groupDataMap[groupKey].guids.push(guidStr);
-            groupDataMap[groupKey].count++;
+        if (summaryRows && summaryRows.length > 0) {
+          for (let i = 0; i < summaryRows.length; i++) {
+            const row       = summaryRows[i];
+            const label     = row.materialLabel || '';
+            const widthMM   = row.widthMM || 0;
+            const heightMM  = row.heightMM || 0;
+            const count     = row.count || 0;
+            const guids     = Array.isArray(row.guids) ? row.guids : [];
+
+            const groupKey = label + "||" + widthMM + "||" + heightMM;
+            groupDataMap[groupKey] = {
+              guids: guids.slice(),
+              type: 'ArchiFramePlank',
+              id: label,
+              layer: '',
+              count: count
+            };
           }
         }
         
         // Оптимизация: формируем весь HTML за раз
         let html = '';
         if (Object.keys(groupDataMap).length === 0) {
-          html = '<tr><td colspan="5">Нет выбранных элементов</td></tr>';
+          html = '<tr><td colspan="5">Нет выбранных досок ArchiFramePlank</td></tr>';
         } else {
           // Проверяем состояние чекбоксов для обновления selectedGuids
           // Сохраняем текущее состояние чекбоксов перед перерисовкой
@@ -374,12 +371,25 @@
         // Одна операция DOM вместо множества
         selectionTable.innerHTML = html;
         
-        // Обновляем индикаторы сортировки
         updateSortIndicators();
-        
-        // Обновляем состояние чекбокса "выбрать всё"
         updateSelectAllCheckbox();
-      }).catch(err => console.log('[UI] GetSelectedElements error: ' + err));
+
+        // Обновляем агрегированную сводку по пиломатериалам
+        const summaryDiv = document.getElementById('material-summary');
+        if (summaryDiv) {
+          const keys = Object.keys(groupDataMap);
+          if (keys.length === 0) {
+            summaryDiv.textContent = 'Пиломатериалы не найдены в текущем выделении.';
+          } else {
+            let lines = ['Выбрано пиломатериалов:'];
+            keys.forEach(key => {
+              const group = groupDataMap[key];
+              lines.push(group.id + ' — ' + group.count + ' шт.');
+            });
+            summaryDiv.textContent = lines.join('\\n');
+          }
+        }
+      }).catch(err => console.log('[UI] GetArchiFramePlankSummary error: ' + err));
     }
 
     function toggleRowCheckbox(groupKey) {
@@ -530,6 +540,59 @@
       });
     }
 
+    function populateFloors() {
+      const A = window.ACAPI;
+      const select = document.getElementById('floor-select');
+      if (!select || !A || typeof A.GetFloors !== 'function') return;
+
+      A.GetFloors().then(function(floors) {
+        select.innerHTML = '';
+        if (!floors || floors.length === 0) {
+          const opt = document.createElement('option');
+          opt.value = '0';
+          opt.textContent = 'Этажи недоступны';
+          select.appendChild(opt);
+          return;
+        }
+        floors.forEach(function(f) {
+          const opt = document.createElement('option');
+          opt.value = String(f.index);
+          opt.textContent = f.name || ('Этаж ' + f.index);
+          select.appendChild(opt);
+        });
+      }).catch(function(err) {
+        console.log('[UI] GetFloors error: ' + err);
+      });
+    }
+
+    function createCutPlan() {
+      const A = window.ACAPI;
+      if (!A || typeof A.RunCuttingPlan !== 'function') {
+        setInfo("selection-info", "ACAPI.RunCuttingPlan недоступен.");
+        return;
+      }
+
+      const kerfInput = document.getElementById('kerf-input');
+      const floorSelect = document.getElementById('floor-select');
+      const slit = kerfInput ? parseFloat(kerfInput.value) || 4.0 : 4.0;
+      const floorIndex = floorSelect ? parseInt(floorSelect.value || '0', 10) || 0 : 0;
+
+      if (!groupDataMap || Object.keys(groupDataMap).length === 0) {
+        setInfo("selection-info", "Нет выбранных досок ArchiFramePlank — выберите элементы на плане.");
+        return;
+      }
+
+      A.RunCuttingPlan([slit, floorIndex]).then(function(ok) {
+        if (ok) {
+          setInfo("selection-info", "План распила создан и экспортирован в CSV.");
+        } else {
+          setInfo("selection-info", "Не удалось создать план распила (см. журнал).");
+        }
+      }).catch(function(err) {
+        setInfo("selection-info", "Ошибка при создании плана распила: " + err);
+      });
+    }
+
     // =============== ACAPI bridge waiting ===============
     function whenACAPIReadyDo(cb) {
       let fired = false;
@@ -569,6 +632,7 @@
     // Инициализация при загрузке
     whenACAPIReadyDo(function() {
       UpdateSelectedElements();
+      populateFloors();
     });
 
     // Обработчик для кнопки справки (делегирование событий)
@@ -622,13 +686,25 @@
             <th>Кол-во</th>
           </tr>
         </thead>
-        <tbody id="selection"><tr><td colspan="5">Нет выбранных элементов</td></tr></tbody>
+        <tbody id="selection"><tr><td colspan="5">Нет выбранных досок ArchiFramePlank</td></tr></tbody>
       </table>
-      <div id="selection-info" class="info-box">Отметьте группы чекбоксами и нажмите OK, чтобы оставить в выделении только выбранные группы.</div>
+      <div id="selection-info" class="info-box">Отметьте материалы ArchiFramePlank и нажмите OK, чтобы оставить в выделении только выбранные группы.</div>
+      <div id="material-summary" class="info-box" style="margin-top:4px;">Пиломатериалы не найдены в текущем выделении.</div>
+      <div class="controls-row">
+        <div>
+          <label for="kerf-input">Толщина пилы, мм</label>
+          <input type="number" id="kerf-input" min="0" step="0.1" value="4" style="width:60px;margin-left:4px;">
+        </div>
+        <div>
+          <label for="floor-select">Этаж</label>
+          <select id="floor-select" style="max-width:120px;"></select>
+        </div>
+      </div>
       <div class="controls-row">
         <button class="button-flat help-button" data-help-url="https://landscape.227.info/help/selection">Справка</button>
         <button class="button-flat" onclick="exportToExcel()">Отправить в Excel</button>
-        <button id="selection-ok-btn" class="button-flat button-primary" onclick="applyCheckedSelection()">OK</button>
+        <button class="button-flat button-primary" onclick="createCutPlan()">Создать план распила</button>
+        <button id="selection-ok-btn" class="button-flat" onclick="applyCheckedSelection()">OK</button>
       </div>
     </div>
   </div>
