@@ -1,0 +1,22 @@
+^C:\PROGRAM FILES\GRAPHISOFT\API.DEVELOPMENT.KIT.WIN.29.3100\EXAMPLES\ARCHPLANKS\BUILD\CMAKEFILES\8B389BF4F281FC92F7857C59F31AEB89\ADDONRESOURCES.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E make_directory "C:/Program Files/Graphisoft/API.Development.Kit.WIN.29.3100/Examples/ArchPlanks/build/ResourceObjects"
+if %errorlevel% neq 0 goto :cmEnd
+C:\Users\count\AppData\Local\Programs\Python\Python312\python.exe "C:/Program Files/Graphisoft/API.Development.Kit.WIN.29.3100/Support/Tools/CompileResources.py" INT "C:/Program Files/Graphisoft/API.Development.Kit.WIN.29.3100/Examples/ArchPlanks/../.." "C:/Program Files/Graphisoft/API.Development.Kit.WIN.29.3100/Examples/ArchPlanks/Src" "C:/Program Files/Graphisoft/API.Development.Kit.WIN.29.3100/Examples/ArchPlanks" "C:/Program Files/Graphisoft/API.Development.Kit.WIN.29.3100/Examples/ArchPlanks/build/ResourceObjects" "C:/Program Files/Graphisoft/API.Development.Kit.WIN.29.3100/Examples/ArchPlanks/build/ResourceObjects/ArchPlanks.res"
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch "C:/Program Files/Graphisoft/API.Development.Kit.WIN.29.3100/Examples/ArchPlanks/build/ResourceObjects/AddOnResources.stamp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\PROGRAM FILES\GRAPHISOFT\API.DEVELOPMENT.KIT.WIN.29.3100\EXAMPLES\ARCHPLANKS\BUILD\CMAKEFILES\CB5F6E163262D5744F7865A242FEE10A\ADDONRESOURCES.RULE
+setlocal
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

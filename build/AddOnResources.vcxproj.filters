@@ -1,0 +1,73 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\build\CMakeFiles\8b389bf4f281fc92f7857c59f31aeb89\AddOnResources.stamp.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\build\CMakeFiles\cb5f6e163262d5744f7865a242fee10a\AddOnResources.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\RFIX.win\Browser_Repl.rc2">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\RFIX\Browser_ReplFix.grc">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\RINT\Browser_Repl.grc">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\RFIX\Images\CSV_28x28.svg">
+      <Filter>Images</Filter>
+    </None>
+    <None Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\RFIX\Images\Close_28x28.svg">
+      <Filter>Images</Filter>
+    </None>
+    <None Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\RFIX\Images\Contour_28x28.svg">
+      <Filter>Images</Filter>
+    </None>
+    <None Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\RFIX\Images\Dims_28x28.svg">
+      <Filter>Images</Filter>
+    </None>
+    <None Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\RFIX\Images\Land_28x28.svg">
+      <Filter>Images</Filter>
+    </None>
+    <None Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\RFIX\Images\Layers_28x28.svg">
+      <Filter>Images</Filter>
+    </None>
+    <None Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\RFIX\Images\Mesh_28x28.svg">
+      <Filter>Images</Filter>
+    </None>
+    <None Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\RFIX\Images\Random_28x28.svg">
+      <Filter>Images</Filter>
+    </None>
+    <None Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\RFIX\Images\RotSurf_28x28.svg">
+      <Filter>Images</Filter>
+    </None>
+    <None Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\RFIX\Images\Rotate_28x28.svg">
+      <Filter>Images</Filter>
+    </None>
+    <None Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\RFIX\Images\Spline_28x28.svg">
+      <Filter>Images</Filter>
+    </None>
+    <None Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\RFIX\Images\Support_28x28.svg">
+      <Filter>Images</Filter>
+    </None>
+    <None Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\RFIX\Images\Table_28x28.svg">
+      <Filter>Images</Filter>
+    </None>
+    <None Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\build\CMakeFiles\AddOnResources" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{D989B3E6-149B-3CE0-B841-052CA3E3891D}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Images">
+      <UniqueIdentifier>{7CE3F756-419B-38F4-8C29-8E71A6704CF8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources">
+      <UniqueIdentifier>{E382296F-05D0-33FE-9E0B-0EB791DE2B70}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

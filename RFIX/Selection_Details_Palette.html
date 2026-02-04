@@ -298,10 +298,13 @@
         groupDataMap = {};
         if (summaryRows && summaryRows.length > 0) {
           for (let i = 0; i < summaryRows.length; i++) {
-            const row       = summaryRows[i];
-            const label     = row.materialLabel || '';
+            const row       = summaryRows[i] || {};
             const widthMM   = row.widthMM || 0;
             const heightMM  = row.heightMM || 0;
+            const fallbackLabel = (widthMM > 0 && heightMM > 0)
+              ? (widthMM.toFixed(0) + ' x ' + heightMM.toFixed(0) + ' мм')
+              : 'Пиломатериал';
+            const label     = row.materialLabel || fallbackLabel;
             const count     = row.count || 0;
             const guids     = Array.isArray(row.guids) ? row.guids : [];
 
@@ -311,7 +314,9 @@
               type: 'ArchiFramePlank',
               id: label,
               layer: '',
-              count: count
+              count: count,
+              widthMM: widthMM,
+              heightMM: heightMM
             };
           }
         }
@@ -381,10 +386,13 @@
           if (keys.length === 0) {
             summaryDiv.textContent = 'Пиломатериалы не найдены в текущем выделении.';
           } else {
-            let lines = ['Выбрано пиломатериалов:'];
+            let lines = [];
             keys.forEach(key => {
               const group = groupDataMap[key];
-              lines.push(group.id + ' — ' + group.count + ' шт.');
+              const label = group.id && group.id.length
+                ? group.id
+                : ((group.widthMM || 0).toFixed(0) + ' x ' + (group.heightMM || 0).toFixed(0) + ' мм');
+              lines.push(label + ' — ' + group.count + ' шт.');
             });
             summaryDiv.textContent = lines.join('\\n');
           }
@@ -574,15 +582,17 @@
 
       const kerfInput = document.getElementById('kerf-input');
       const floorSelect = document.getElementById('floor-select');
+      const extraLenInput = document.getElementById('extra-length-input');
       const slit = kerfInput ? parseFloat(kerfInput.value) || 4.0 : 4.0;
       const floorIndex = floorSelect ? parseInt(floorSelect.value || '0', 10) || 0 : 0;
+      const extraLenMM = extraLenInput ? parseFloat(extraLenInput.value) || 0.0 : 0.0;
 
       if (!groupDataMap || Object.keys(groupDataMap).length === 0) {
         setInfo("selection-info", "Нет выбранных досок ArchiFramePlank — выберите элементы на плане.");
         return;
       }
 
-      A.RunCuttingPlan([slit, floorIndex]).then(function(ok) {
+      A.RunCuttingPlan([slit, floorIndex, extraLenMM]).then(function(ok) {
         if (ok) {
           setInfo("selection-info", "План распила создан и экспортирован в CSV.");
         } else {
@@ -696,13 +706,16 @@
           <input type="number" id="kerf-input" min="0" step="0.1" value="4" style="width:60px;margin-left:4px;">
         </div>
         <div>
+          <label for="extra-length-input">Допуск по длине, мм</label>
+          <input type="number" id="extra-length-input" min="0" step="1" value="20" style="width:60px;margin-left:4px;">
+        </div>
+        <div>
           <label for="floor-select">Этаж</label>
           <select id="floor-select" style="max-width:120px;"></select>
         </div>
       </div>
       <div class="controls-row">
         <button class="button-flat help-button" data-help-url="https://landscape.227.info/help/selection">Справка</button>
-        <button class="button-flat" onclick="exportToExcel()">Отправить в Excel</button>
         <button class="button-flat button-primary" onclick="createCutPlan()">Создать план распила</button>
         <button id="selection-ok-btn" class="button-flat" onclick="applyCheckedSelection()">OK</button>
       </div>

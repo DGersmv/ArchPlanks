@@ -461,6 +461,7 @@ void BrowserRepl::RegisterACAPIJavaScriptObject(DG::Browser& targetBrowser)
 	jsACAPI->AddItem(new JS::Function("RunCuttingPlan", [](GS::Ref<JS::Base> param) {
 		double slitMM = 0.0;
 		short floorInd = 0;
+		double extraLenMM = 20.0; // допуск по длине по умолчанию, мм
 
 		if (param != nullptr) {
 			if (GS::Ref<JS::Array> arr = GS::DynamicCast<JS::Array>(param)) {
@@ -469,12 +470,14 @@ void BrowserRepl::RegisterACAPIJavaScriptObject(DG::Browser& targetBrowser)
 					slitMM = GetDoubleFromJs(items[0], 0.0);
 				if (items.GetSize() > 1)
 					floorInd = static_cast<short>(GetIntFromJs(items[1], 0));
+				if (items.GetSize() > 2)
+					extraLenMM = GetDoubleFromJs(items[2], 20.0);
 			} else {
 				slitMM = GetDoubleFromJs(param, 0.0);
 			}
 		}
 
-		const bool ok = CutPlanBoardHelper::RunCuttingPlan(slitMM, floorInd);
+		const bool ok = CutPlanBoardHelper::RunCuttingPlan(slitMM, extraLenMM, floorInd);
 		return new JS::Value(ok);
 	}));
 

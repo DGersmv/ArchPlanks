@@ -1,0 +1,81 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\Src\APICommon.c">
+      <Filter>Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\Src\BrowserRepl.cpp">
+      <Filter>Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\Src\CutPlanBoardHelper.cpp">
+      <Filter>Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\Src\CuttingStockSolver.cpp">
+      <Filter>Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\Src\GDLHelper.cpp">
+      <Filter>Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\Src\LicenseManager.cpp">
+      <Filter>Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\Src\Main.cpp">
+      <Filter>Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\Src\SelectionDetailsPalette.cpp">
+      <Filter>Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\Src\SelectionHelper.cpp">
+      <Filter>Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\Src\SelectionMetricsHelper.cpp">
+      <Filter>Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\Src\SelectionPropertyHelper.cpp">
+      <Filter>Sources</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\Src\APICommon.h">
+      <Filter>Sources</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\Src\APIEnvir.h">
+      <Filter>Sources</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\Src\BrowserRepl.hpp">
+      <Filter>Sources</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\Src\CutPlanBoardHelper.hpp">
+      <Filter>Sources</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\Src\CuttingStockSolver.hpp">
+      <Filter>Sources</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\Src\GDLHelper.hpp">
+      <Filter>Sources</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\Src\LicenseManager.hpp">
+      <Filter>Sources</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\Src\ResourceIDs.hpp">
+      <Filter>Sources</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\Src\SelectionDetailsPalette.hpp">
+      <Filter>Sources</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\Src\SelectionHelper.hpp">
+      <Filter>Sources</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\Src\SelectionMetricsHelper.hpp">
+      <Filter>Sources</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Program Files\Graphisoft\API.Development.Kit.WIN.29.3100\Examples\ArchPlanks\Src\SelectionPropertyHelper.hpp">
+      <Filter>Sources</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Sources">
+      <UniqueIdentifier>{2054E014-52F7-38C2-A028-35CD4EDD167D}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

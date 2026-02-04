@@ -1,0 +1,3 @@
+C:/Program Files/Graphisoft/API.Development.Kit.WIN.29.3100/Examples/ArchPlanks/build/CMakeFiles/AddOnResources.dir
+C:/Program Files/Graphisoft/API.Development.Kit.WIN.29.3100/Examples/ArchPlanks/build/CMakeFiles/AddOn.dir
+C:/Program Files/Graphisoft/API.Development.Kit.WIN.29.3100/Examples/ArchPlanks/build/CMakeFiles/ALL_BUILD.dir

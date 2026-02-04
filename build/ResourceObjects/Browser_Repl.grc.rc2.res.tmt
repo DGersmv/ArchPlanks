@@ -1,0 +1,6 @@
+DLG_32500_Browser_Repl	32500	0		""
+DLG_32500_Browser_Repl-IconButton_0	32500	1		"Close"
+DLG_32500_Browser_Repl-IconButton_1	32500	2		"Выборка"
+DLG_32500_Browser_Repl-IconButton_2	32500	3		"Support"
+DLG_32610_SelectionDetails_Browser	32610	0	Выборка	""
+DLG_32610_SelectionDetails_Browser-Browser_0	32610	1	Выборка	"Выборка Browser Control"

@@ -34,6 +34,53 @@ static GS::UniString BuildMaterialLabel(double widthMM, double heightMM)
 	return GS::UniString::Printf("%.0f x %.0f \u043C\u043C", widthMM, heightMM);
 }
 
+static const char* AddParTypeName(API_AddParID typeID)
+{
+	switch (typeID) {
+		case API_ZombieParT:        return "Zombie";
+		case APIParT_Integer:       return "Integer";
+		case APIParT_Length:       return "Length";
+		case APIParT_Angle:        return "Angle";
+		case APIParT_RealNum:      return "RealNum";
+		case APIParT_LightSw:      return "LightSw";
+		case APIParT_ColRGB:       return "ColRGB";
+		case APIParT_Intens:       return "Intens";
+		case APIParT_LineTyp:     return "LineTyp";
+		case APIParT_Mater:        return "Mater";
+		case APIParT_FillPat:      return "FillPat";
+		case APIParT_PenCol:       return "PenCol";
+		case APIParT_CString:      return "CString";
+		case APIParT_Boolean:      return "Boolean";
+		case APIParT_Separator:    return "Separator";
+		case APIParT_Title:        return "Title";
+		case APIParT_BuildingMaterial: return "BuildingMaterial";
+		case APIParT_Profile:      return "Profile";
+		case APIParT_Dictionary:  return "Dictionary";
+		default:                   return "?";
+	}
+}
+
+static void FillDefaultsFromLibPart(Int32 libInd, double* outHeight, double* outWidth, double* outLen, double* outMaxLen)
+{
+	double a = 0.0, b = 0.0;
+	Int32 addParNum = 0;
+	API_AddParType** addPars = nullptr;
+	if (ACAPI_LibraryPart_GetParams(libInd, &a, &b, &addParNum, &addPars) != NoError || addPars == nullptr || *addPars == nullptr)
+		return;
+	for (Int32 i = 0; i < addParNum; ++i) {
+		const API_AddParType& p = (*addPars)[i];
+		if (CHEqualASCII(p.name, "iHeight", GS::CaseInsensitive) && outHeight && *outHeight == 0.0)
+			*outHeight = p.value.real;
+		else if (CHEqualASCII(p.name, "iWidth", GS::CaseInsensitive) && outWidth && *outWidth == 0.0)
+			*outWidth = p.value.real;
+		else if (CHEqualASCII(p.name, "iLen", GS::CaseInsensitive) && outLen && *outLen == 0.0)
+			*outLen = p.value.real;
+		else if (CHEqualASCII(p.name, "iMaxLen", GS::CaseInsensitive) && outMaxLen && *outMaxLen == 0.0)
+			*outMaxLen = p.value.real;
+	}
+	ACAPI_DisposeAddParHdl(&addPars);
+}
+
 } // anonymous
 
 bool IsArchiFramePlank(const API_Guid& guid)
@@ -73,6 +120,15 @@ bool GetArchiFramePlankParams(const API_Guid& guid, ArchiFramePlankParams& out)
 	out.iMaxLen = GetAddParReal(memo.params, count, "iMaxLen");
 	out.iWidth = GetAddParReal(memo.params, count, "iWidth");
 	ACAPI_DisposeElemMemoHdls(&memo);
+	// Если в экземпляре 0 — подставляем значения по умолчанию из библиотечной части
+	if (out.iHeight == 0.0 || out.iWidth == 0.0 || out.iLen == 0.0 || out.iMaxLen == 0.0)
+		FillDefaultsFromLibPart(element.object.libInd, &out.iHeight, &out.iWidth, &out.iLen, &out.iMaxLen);
+	// GDL Length-параметры приходят в метрах; переводим в мм для отображения и расчёта распила
+	const double mToMM = 1000.0;
+	out.iHeight *= mToMM;
+	out.iWidth  *= mToMM;
+	out.iLen    *= mToMM;
+	out.iMaxLen *= mToMM;
 	return (out.iLen > 0 && out.iMaxLen > 0);
 }
 
@@ -143,11 +199,14 @@ GS::Array<ArchiFrameSummaryRow> CollectArchiFrameSummaryFromSelection()
 			row.heightMM = heightMM;
 			row.materialLabel = label;
 			row.count = 0;
+			row.totalLenMM = 0.0;
+			row.maxLenMM = p.iMaxLen;
 			rows.Push(row);
 			targetRow = &rows[rows.GetSize() - 1];
 		}
 
 		targetRow->count += 1;
+		targetRow->totalLenMM += p.iLen;
 		targetRow->guidStrs.Push(guidStr);
 	}
 
@@ -169,24 +228,154 @@ CuttingStock::SolverParams DefaultSolverParams()
 GS::UniString BuildCutPlanCsv(const CuttingStock::SolverResult& result, double slit)
 {
 	GS::UniString csv;
-	csv += "Board;BoardW;Cut1;Cut2;Cut3;Cut4;Cut5;Cut6;Cut7;Cut8;Cut9;Cut10;Remainder;Kerf\r\n";
+
+	// Определяем максимальное количество отрезков на доску,
+	// чтобы сформировать заголовок Cut1..CutN и строки полной ширины.
+	UIndex maxCuts = 0;
 	for (UIndex b = 0; b < result.boards.GetSize(); ++b) {
 		const CuttingStock::ResultBoard& rb = result.boards[b];
-		csv += GS::UniString::Printf("%d;%.2f;", (int)(b + 1), rb.boardW);
-		for (UIndex c = 0; c < 10; ++c) {
+		if (rb.cuts.GetSize() > maxCuts)
+			maxCuts = rb.cuts.GetSize();
+	}
+
+	csv += "Board;BoardW;";
+	for (UIndex c = 0; c < maxCuts; ++c) {
+		csv += GS::UniString::Printf("Cut%u;", (unsigned)(c + 1));
+	}
+	csv += "Remainder;Kerf\r\n";
+
+	for (UIndex b = 0; b < result.boards.GetSize(); ++b) {
+		const CuttingStock::ResultBoard& rb = result.boards[b];
+		csv += GS::UniString::Printf("%d;%.0f;", (int)(b + 1), rb.boardW);
+		for (UIndex c = 0; c < maxCuts; ++c) {
 			if (c < rb.cuts.GetSize())
-				csv += GS::UniString::Printf("%.2f;", rb.cuts[c]);
+				csv += GS::UniString::Printf("%.0f;", rb.cuts[c]);
 			else
 				csv += ";";
 		}
-		csv += GS::UniString::Printf("%.2f;%.2f\r\n", rb.remainder, slit);
+		csv += GS::UniString::Printf("%.0f;%.0f\r\n", rb.remainder, slit);
 	}
 	csv += "\r\n";
 	csv += "Remaining parts (length;boardW;material)\r\n";
 	for (UIndex i = 0; i < result.remaining.GetSize(); ++i) {
 		const CuttingStock::Part& p = result.remaining[i];
-		csv += GS::UniString::Printf("%.2f;%.2f;%s\r\n", p.length, p.boardW, p.material.ToCStr().Get());
+		csv += GS::UniString::Printf("%.0f;%.0f;%s\r\n", p.length, p.boardW, p.material.ToCStr().Get());
 	}
+
+	// Сводка по пиломатериалам: толщина/ширина, количество и объём в м3
+	csv += "\r\n";
+	csv += "Material summary (boardT_mm;boardW_mm;count;volume_m3)\r\n";
+	GS::Array<ArchiFrameSummaryRow> summaryRows = CollectArchiFrameSummaryFromSelection();
+	for (UIndex i = 0; i < summaryRows.GetSize(); ++i) {
+		const ArchiFrameSummaryRow& row = summaryRows[i];
+		const double boardTmm = row.widthMM;   // толщина (iWidth)
+		const double boardWmm = row.heightMM;  // ширина (iHeight)
+		const double maxLenMM = (row.maxLenMM > 0.0 ? row.maxLenMM : 6000.0);
+		double boardsCountD = 0.0;
+		if (maxLenMM > 0.0 && row.totalLenMM > 0.0)
+			boardsCountD = std::ceil(row.totalLenMM / maxLenMM);
+		const unsigned boardsCount = boardsCountD > 0.0 ? (unsigned)boardsCountD : 0u;
+
+		const double boardTm = boardTmm / 1000.0;
+		const double boardWm = boardWmm / 1000.0;
+		const double maxLenM = maxLenMM / 1000.0;
+		const double volumeM3 = boardsCount * maxLenM * boardTm * boardWm;
+		csv += GS::UniString::Printf("%.0f;%.0f;%u;%.3f\r\n", boardTmm, boardWmm, boardsCount, volumeM3);
+	}
+
+	// Сводка по отрезкам: толщина/ширина доски и длина отрезка
+	csv += "\r\n";
+	csv += "Cut summary (boardT_mm;boardW_mm;cutLen_mm;count)\r\n";
+
+	struct CutSummaryRow {
+		double boardTmm;
+		double boardWmm;
+		double cutLenMM;
+		unsigned count;
+	};
+
+	GS::Array<CutSummaryRow> cutSummary;
+
+	// Карта height (ширина) -> thickness (толщина) по исходной сводке
+	auto FindThicknessForWidth = [&summaryRows](double boardWmm) -> double {
+		for (UIndex i = 0; i < summaryRows.GetSize(); ++i) {
+			const ArchiFrameSummaryRow& row = summaryRows[i];
+			if (std::fabs(row.heightMM - boardWmm) < 0.001) {
+				return row.widthMM;
+			}
+		}
+		return 0.0;
+	};
+
+	for (UIndex b = 0; b < result.boards.GetSize(); ++b) {
+		const CuttingStock::ResultBoard& rb = result.boards[b];
+		const double boardWmm = rb.boardW;                // ширина
+		const double boardTmm = FindThicknessForWidth(boardWmm); // толщина
+
+		for (UIndex c = 0; c < rb.cuts.GetSize(); ++c) {
+			double cutLenMM = rb.cuts[c];
+			if (cutLenMM <= 0.0)
+				continue;
+
+			// Нормализуем до целых мм
+			cutLenMM = std::round(cutLenMM);
+
+			// Ищем существующую запись
+			CutSummaryRow* row = nullptr;
+			for (UIndex k = 0; k < cutSummary.GetSize(); ++k) {
+				CutSummaryRow& r = cutSummary[k];
+				if (std::fabs(r.boardTmm - boardTmm) < 0.001 &&
+					std::fabs(r.boardWmm - boardWmm) < 0.001 &&
+					std::fabs(r.cutLenMM - cutLenMM) < 0.001) {
+					row = &r;
+					break;
+				}
+			}
+
+			if (row == nullptr) {
+				CutSummaryRow r;
+				r.boardTmm = boardTmm;
+				r.boardWmm = boardWmm;
+				r.cutLenMM = cutLenMM;
+				r.count = 0;
+				cutSummary.Push(r);
+				row = &cutSummary[cutSummary.GetSize() - 1];
+			}
+
+			row->count += 1;
+		}
+	}
+
+	// Сортируем по толщине, ширине, длине
+	for (UIndex i = 0; i < cutSummary.GetSize(); ++i) {
+		for (UIndex j = i + 1; j < cutSummary.GetSize(); ++j) {
+			const CutSummaryRow& a = cutSummary[i];
+			const CutSummaryRow& bRow = cutSummary[j];
+
+			bool swap = false;
+			if (a.boardTmm > bRow.boardTmm + 0.001) {
+				swap = true;
+			} else if (std::fabs(a.boardTmm - bRow.boardTmm) < 0.001 && a.boardWmm > bRow.boardWmm + 0.001) {
+				swap = true;
+			} else if (std::fabs(a.boardTmm - bRow.boardTmm) < 0.001 &&
+					   std::fabs(a.boardWmm - bRow.boardWmm) < 0.001 &&
+					   a.cutLenMM > bRow.cutLenMM + 0.001) {
+				swap = true;
+			}
+
+			if (swap) {
+				CutSummaryRow tmp = cutSummary[i];
+				cutSummary[i] = cutSummary[j];
+				cutSummary[j] = tmp;
+			}
+		}
+	}
+
+	for (UIndex i = 0; i < cutSummary.GetSize(); ++i) {
+		const CutSummaryRow& r = cutSummary[i];
+		csv += GS::UniString::Printf("%.0f;%.0f;%.0f;%u\r\n", r.boardTmm, r.boardWmm, r.cutLenMM, r.count);
+	}
+
 	return csv;
 }
 
@@ -230,7 +419,43 @@ bool ExportCutPlanToExcel(const CuttingStock::SolverResult& result, double slit)
 	return true;
 }
 
-bool RunCuttingPlan(double slitMM, short /*floorIndex*/)
+void DumpArchiFramePlankParamsToReport()
+{
+	API_SelectionInfo selInfo = {};
+	GS::Array<API_Neig> selNeigs;
+	ACAPI_Selection_Get(&selInfo, &selNeigs, false, false);
+	BMKillHandle((GSHandle*)&selInfo.marquee.coords);
+
+	Int32 dumped = 0;
+	for (const API_Neig& n : selNeigs) {
+		if (!IsArchiFramePlank(n.guid))
+			continue;
+		API_ElementMemo memo = {};
+		if (ACAPI_Element_GetMemo(n.guid, &memo, APIMemoMask_AddPars) != NoError)
+			continue;
+		Int32 count = GetAddParCount(memo.params);
+		GS::UniString guidStr = APIGuidToString(n.guid);
+		ACAPI_WriteReport("=== ArchiFramePlank parameters (GUID: %s) ===", false, guidStr.ToCStr().Get());
+		for (Int32 i = 0; i < count; ++i) {
+			const API_AddParType& p = (*memo.params)[i];
+			const char* typeStr = AddParTypeName(p.typeID);
+			if (p.typeID == APIParT_Separator || p.typeID == APIParT_Title) {
+				ACAPI_WriteReport("  [%s] %s", false, typeStr, p.name);
+			} else if (p.typeID == APIParT_CString) {
+				ACAPI_WriteReport("  %s | %s | (string)", false, p.name, typeStr);
+			} else {
+				ACAPI_WriteReport("  %s | %s | %.6g", false, p.name, typeStr, p.value.real);
+			}
+		}
+		ACAPI_DisposeElemMemoHdls(&memo);
+		++dumped;
+		break; // только первый выбранный, чтобы не засорять отчёт
+	}
+	if (dumped == 0)
+		ACAPI_WriteReport("No ArchiFramePlank in selection. Select at least one ArchiFramePlank and run again.", true);
+}
+
+bool RunCuttingPlan(double slitMM, double extraLenMM, short /*floorIndex*/)
 {
 	double maxStockLength = 0.0;
 	GS::Array<CuttingStock::Part> parts = CollectPartsFromSelection(maxStockLength);
@@ -242,7 +467,11 @@ bool RunCuttingPlan(double slitMM, short /*floorIndex*/)
 	CuttingStock::SolverParams params = DefaultSolverParams();
 	if (slitMM > 0.0)
 		params.slit = slitMM;
-	params.maxStockLength = (maxStockLength > 0.0 ? maxStockLength : 6000.0);
+	const double baseMax = (maxStockLength > 0.0 ? maxStockLength : 6000.0);
+	if (extraLenMM > 0.0)
+		params.maxStockLength = baseMax + extraLenMM;
+	else
+		params.maxStockLength = baseMax;
 
 	CuttingStock::SolverResult result = CuttingStock::Solve(parts, params);
 	return ExportCutPlanToExcel(result, params.slit);
