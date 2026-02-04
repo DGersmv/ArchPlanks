@@ -9,11 +9,11 @@
 #include	"ACAPinc.h"
 #include	"ResourceIDs.hpp"
 #include	"BrowserRepl.hpp"
-#include	"HelpPalette.hpp"
 #include	"SelectionDetailsPalette.hpp"
-#include	"SendXlsPalette.hpp"
 #include	"LicenseManager.hpp"
 #include	"APICommon.h"
+
+#include <Windows.h>
 
 // -----------------------------------------------------------------------------
 // Show or Hide Browser Palette
@@ -60,12 +60,12 @@ GSErrCode MenuCommandHandler (const API_MenuParams *menuParams)
 				case 1:
 					SelectionDetailsPalette::ShowPalette();
 					break;
-				case 2:
-					{
-						GS::UniString url = LicenseManager::BuildLicenseUrl();
-						HelpPalette::ShowWithURL(url);
-					}
-					break;
+			case 2:
+				{
+					GS::UniString url = LicenseManager::BuildLicenseUrl();
+					ShellExecuteW(NULL, L"open", url.ToUStr().Get(), NULL, NULL, SW_SHOWNORMAL);
+				}
+				break;
 				case BrowserReplMenuItemIndex:
 					ShowOrHideBrowserRepl();
 					break;
@@ -137,9 +137,7 @@ GSErrCode Initialize ()
 
 	GSErrCode palErr = NoError;
 	palErr |= BrowserRepl::RegisterPaletteControlCallBack ();
-	palErr |= HelpPalette::RegisterPaletteControlCallBack ();
 	palErr |= SelectionDetailsPalette::RegisterPaletteControlCallBack ();
-	palErr |= SendXlsPalette::RegisterPaletteControlCallBack ();
 
 	if (DBERROR (palErr != NoError))
 		return palErr;

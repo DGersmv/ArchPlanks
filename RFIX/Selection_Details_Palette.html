@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>Landscape Helper — Выбранные элементы</title>
+  <title>Выборка</title>
   <style>
     body {
       font-family: 'Segoe UI', Arial, sans-serif;
@@ -491,6 +491,45 @@
       });
     }
 
+    function exportToExcel() {
+      const A = window.ACAPI;
+      if (!A || typeof A.SaveSendXls !== 'function') {
+        setInfo("selection-info", "Ошибка: ACAPI.SaveSendXls недоступен");
+        return;
+      }
+      
+      // Собираем CSV из таблицы
+      const groupKeys = Object.keys(groupDataMap);
+      if (groupKeys.length === 0) {
+        setInfo("selection-info", "Нет данных для экспорта");
+        return;
+      }
+      
+      // Заголовок CSV
+      let csv = "Тип;ID;Слой;Количество\n";
+      
+      // Применяем сортировку и формируем строки
+      const sortedKeys = sortGroupData(groupKeys);
+      for (const groupKey of sortedKeys) {
+        const group = groupDataMap[groupKey];
+        // Экранируем значения для CSV (заменяем ; на ,)
+        const type = (group.type || '').replace(/;/g, ',');
+        const id = (group.id || '').replace(/;/g, ',');
+        const layer = (group.layer || '').replace(/;/g, ',');
+        csv += type + ";" + id + ";" + layer + ";" + group.count + "\n";
+      }
+      
+      A.SaveSendXls(csv).then(function(ok) {
+        if (ok) {
+          setInfo("selection-info", "Данные экспортированы в CSV");
+        } else {
+          setInfo("selection-info", "Экспорт отменён");
+        }
+      }).catch(function(err) {
+        setInfo("selection-info", "Ошибка экспорта: " + err);
+      });
+    }
+
     // =============== ACAPI bridge waiting ===============
     function whenACAPIReadyDo(cb) {
       let fired = false;
@@ -565,7 +604,7 @@
 
 <body>
 <div class="palette">
-  <h1>Выбранные элементы</h1>
+  <h1>Выборка</h1>
 
   <div class="section">
     <div class="section-title">Текущий набор</div>
@@ -588,6 +627,7 @@
       <div id="selection-info" class="info-box">Отметьте группы чекбоксами и нажмите OK, чтобы оставить в выделении только выбранные группы.</div>
       <div class="controls-row">
         <button class="button-flat help-button" data-help-url="https://landscape.227.info/help/selection">Справка</button>
+        <button class="button-flat" onclick="exportToExcel()">Отправить в Excel</button>
         <button id="selection-ok-btn" class="button-flat button-primary" onclick="applyCheckedSelection()">OK</button>
       </div>
     </div>
