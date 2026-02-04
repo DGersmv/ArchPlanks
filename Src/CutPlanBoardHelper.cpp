@@ -3,6 +3,8 @@
 #include "CH.hpp"
 #include <Windows.h>
 #include <commdlg.h>
+#include <cwchar>
+#include <cstdarg>
 #include <cstdio>
 #include <cmath>
 
@@ -225,9 +227,14 @@ CuttingStock::SolverParams DefaultSolverParams()
 	return p;
 }
 
-GS::UniString BuildCutPlanCsv(const CuttingStock::SolverResult& result, double slit)
+GS::UniString BuildCutPlanCsv(const CuttingStock::SolverResult& result, double slit, FastProduction::ScenarioData* outScenarioData)
 {
 	GS::UniString csv;
+	FastProduction::ScenarioData scenarioData;
+	if (outScenarioData) {
+		scenarioData = FastProduction::BuildScenarioData(result, 1, true, 2);
+		*outScenarioData = scenarioData;
+	}
 
 	// Определяем максимальное количество отрезков на доску,
 	// чтобы сформировать заголовок Cut1..CutN и строки полной ширины.
@@ -242,7 +249,11 @@ GS::UniString BuildCutPlanCsv(const CuttingStock::SolverResult& result, double s
 	for (UIndex c = 0; c < maxCuts; ++c) {
 		csv += GS::UniString::Printf("Cut%u;", (unsigned)(c + 1));
 	}
-	csv += "Remainder;Kerf\r\n";
+	csv += "Remainder;Kerf";
+	if (outScenarioData) {
+		csv += ";ScenarioId;ScenarioOps;ScenarioSetups;ScenarioGroup";
+	}
+	csv += "\r\n";
 
 	for (UIndex b = 0; b < result.boards.GetSize(); ++b) {
 		const CuttingStock::ResultBoard& rb = result.boards[b];
@@ -253,7 +264,18 @@ GS::UniString BuildCutPlanCsv(const CuttingStock::SolverResult& result, double s
 			else
 				csv += ";";
 		}
-		csv += GS::UniString::Printf("%.0f;%.0f\r\n", rb.remainder, slit);
+		csv += GS::UniString::Printf("%.0f;%.0f", rb.remainder, slit);
+		if (outScenarioData && b < scenarioData.boardScenarioId.GetSize()) {
+			csv += ";";
+			csv += scenarioData.boardScenarioId[b];
+			csv += ";";
+			csv += scenarioData.boardScenarioOps[b];
+			csv += ";";
+			csv += GS::UniString::Printf("%d", scenarioData.boardScenarioSetups[b]);
+			csv += ";";
+			csv += scenarioData.boardScenarioGroup[b];
+		}
+		csv += "\r\n";
 	}
 	csv += "\r\n";
 	csv += "Remaining parts (length;boardW;material)\r\n";
@@ -379,32 +401,21 @@ GS::UniString BuildCutPlanCsv(const CuttingStock::SolverResult& result, double s
 	return csv;
 }
 
-bool ExportCutPlanToExcel(const CuttingStock::SolverResult& result, double slit)
-{
-	GS::UniString csv = BuildCutPlanCsv(result, slit);
-	wchar_t pathBuf[MAX_PATH] = L"";
-	OPENFILENAMEW ofn = {};
-	ofn.lStructSize = sizeof(ofn);
-	ofn.lpstrFilter = L"CSV files (*.csv)\0*.csv\0All files (*.*)\0*.*\0";
-	ofn.lpstrFile = pathBuf;
-	ofn.nMaxFile = MAX_PATH;
-	ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
-	ofn.lpstrDefExt = L"csv";
-	if (!GetSaveFileNameW(&ofn))
-		return false;
+namespace {
 
-	FILE* fp = _wfopen(pathBuf, L"wb");
+static bool WriteUtf8File(const wchar_t* path, const GS::UniString& content)
+{
+	FILE* fp = _wfopen(path, L"wb");
 	if (!fp)
 		return false;
-
 	const unsigned char bom[] = { 0xEF, 0xBB, 0xBF };
 	if (fwrite(bom, 1, 3, fp) != 3) {
 		fclose(fp);
 		return false;
 	}
-	const int wideLen = (int)csv.GetLength();
+	const int wideLen = (int)content.GetLength();
 	if (wideLen > 0) {
-		const wchar_t* wstr = csv.ToUStr().Get();
+		const wchar_t* wstr = content.ToUStr().Get();
 		int utf8Size = WideCharToMultiByte(CP_UTF8, 0, wstr, wideLen, NULL, 0, NULL, NULL);
 		if (utf8Size > 0) {
 			GS::Array<char> buf(utf8Size);
@@ -416,6 +427,207 @@ bool ExportCutPlanToExcel(const CuttingStock::SolverResult& result, double slit)
 		}
 	}
 	fclose(fp);
+	return true;
+}
+
+/** Write text file in Windows-1251 so Notepad opens it without ? (Cyrillic). */
+static bool WriteAnsiFile(const wchar_t* path, const GS::UniString& content)
+{
+	FILE* fp = _wfopen(path, L"wb");
+	if (!fp)
+		return false;
+	const int wideLen = (int)content.GetLength();
+	if (wideLen > 0) {
+		const wchar_t* wstr = content.ToUStr().Get();
+		const UINT cp = 1251;  /* Windows-1251 Cyrillic */
+		int ansiSize = WideCharToMultiByte(cp, 0, wstr, wideLen, NULL, 0, NULL, NULL);
+		if (ansiSize > 0) {
+			GS::Array<char> buf(ansiSize);
+			WideCharToMultiByte(cp, 0, wstr, wideLen, buf.GetContent(), ansiSize, NULL, NULL);
+			if (fwrite(buf.GetContent(), 1, (size_t)ansiSize, fp) != (size_t)ansiSize) {
+				fclose(fp);
+				return false;
+			}
+		}
+	}
+	fclose(fp);
+	return true;
+}
+
+static double FindThicknessForBoardW(const GS::Array<ArchiFrameSummaryRow>& summaryRows, double boardWmm)
+{
+	for (UIndex i = 0; i < summaryRows.GetSize(); ++i) {
+		if (std::fabs(summaryRows[i].heightMM - boardWmm) < 0.001)
+			return summaryRows[i].widthMM;
+	}
+	return 0.0;
+}
+
+static void AppendWideLine(GS::UniString& txt, const wchar_t* fmt, ...)
+{
+	wchar_t buf[1024];
+	va_list args;
+	va_start(args, fmt);
+	int n = vswprintf_s(buf, fmt, args);
+	va_end(args);
+	if (n > 0)
+		txt += GS::UniString(buf);
+}
+
+static GS::UniString BuildOperatorInstructions(const FastProduction::ScenarioData& scenarioData,
+	const CuttingStock::SolverResult& result,
+	const GS::Array<ArchiFrameSummaryRow>& summaryRows)
+{
+	GS::UniString txt;
+	/* Use wide string literals (L"...") so Cyrillic is correct; then WriteAnsiFile(1251) will convert properly. */
+	if (!result.boards.IsEmpty()) {
+		GS::Array<double> widths;
+		for (UIndex b = 0; b < result.boards.GetSize(); ++b) {
+			double w = result.boards[b].boardW;
+			bool found = false;
+			for (UIndex d = 0; d < widths.GetSize(); ++d) {
+				if (std::fabs(widths[d] - w) < 0.001) { found = true; break; }
+			}
+			if (!found)
+				widths.Push(w);
+		}
+		AppendWideLine(txt, L"=== \u0412\u0441\u0435\u0433\u043E \u0434\u043E\u0441\u043E\u043A ===\r\n");
+		for (UIndex d = 0; d < widths.GetSize(); ++d) {
+			double boardW = widths[d];
+			UInt32 count = 0;
+			for (UIndex b = 0; b < result.boards.GetSize(); ++b) {
+				if (std::fabs(result.boards[b].boardW - boardW) < 0.001)
+					count++;
+			}
+			double thickness = FindThicknessForBoardW(summaryRows, boardW);
+			if (thickness < 0.001) thickness = 0.0;
+			AppendWideLine(txt, L"\u0412\u0441\u0435\u0433\u043E %u \u0448\u0442 %.0fx%.0f \u043C\u043C\r\n", (unsigned)count, thickness, boardW);
+		}
+		txt += GS::UniString(L"\r\n\r\n");
+	}
+
+	AppendWideLine(txt, L"=== \u041F\u0440\u043E\u0433\u0440\u0430\u043C\u043C\u044B \u0440\u0430\u0441\u043F\u0438\u043B\u0430 ===\r\n\r\n");
+	for (UIndex s = 0; s < scenarioData.scenarios.GetSize(); ++s) {
+		const FastProduction::ScenarioInfo& info = scenarioData.scenarios[s];
+		double thickness = FindThicknessForBoardW(summaryRows, info.boardW);
+		if (thickness < 0.001) thickness = 0.0;
+		/* ScenarioId is ASCII (e.g. W195_S00); convert to wide for format */
+		GS::UniString sid = info.scenarioId;
+		AppendWideLine(txt, L"--- %s (\u0411\u0435\u0440\u0451\u043C %d \u0434\u043E\u0441\u043E\u043A %.0fx%.0f \u043C\u043C) ---\r\n",
+			sid.ToUStr().Get(), info.boardsCount, thickness, info.boardW);
+		const bool oneSetup = (info.steps.GetSize() == 1);
+		for (UIndex r = 0; r < info.steps.GetSize(); ++r) {
+			const FastProduction::ScenarioStepInfo& step = info.steps[r];
+			const bool isFirst = (r == 0);
+			const bool isLast = (r == info.steps.GetSize() - 1);
+			if (oneSetup) {
+				AppendWideLine(txt, L"\u0423\u043F\u043E\u0440 %d \u043C\u043C \u2014 \u043F\u0438\u043B\u0438\u043C \u0431\u0435\u0437 \u043E\u0441\u0442\u0430\u0442\u043A\u0430 (%d \u0440\u0435\u0437\u043E\u0432 \u0441 \u043A\u0430\u0436\u0434\u043E\u0439 \u0434\u043E\u0441\u043A\u0438). ", step.stopLength, step.cutsPerBoard);
+				AppendWideLine(txt, L"\u041E\u0441\u0442\u0430\u0442\u043E\u043A %.0f \u043C\u043C \u043D\u0430 \u0434\u043E\u0441\u043A\u0443. \u0412\u0441\u0435\u0433\u043E %d \u0434\u043E\u0441\u043E\u043A, %d \u0440\u0435\u0437\u043E\u0432.\r\n", info.remainderMm, info.boardsCount, step.totalCuts);
+			} else {
+				if (isFirst) {
+					AppendWideLine(txt, L"\u0423\u043F\u043E\u0440 %d \u043C\u043C \u2014 \u043F\u0438\u043B\u0438\u043C (%d \u0440\u0435\u0437 \u0441 \u043A\u0430\u0436\u0434\u043E\u0439). \u041E\u0441\u0442\u0430\u0442\u043E\u043A \u043E\u0442\u043A\u043B\u0430\u0434\u044B\u0432\u0430\u0435\u043C \u0432 \u043F\u0430\u0447\u043A\u0443.\r\n", step.stopLength, step.cutsPerBoard);
+				} else if (isLast) {
+					AppendWideLine(txt, L"\u0423\u043F\u043E\u0440 %d \u043C\u043C \u2014 \u0431\u0435\u0440\u0451\u043C \u043E\u0441\u0442\u0430\u0442\u043E\u043A \u0438\u0437 \u043F\u0430\u0447\u043A\u0438, \u043F\u0438\u043B\u0438\u043C (%d \u0440\u0435\u0437 \u0441 \u043A\u0430\u0436\u0434\u043E\u0439). ", step.stopLength, step.cutsPerBoard);
+					AppendWideLine(txt, L"\u041E\u0441\u0442\u0430\u0442\u043E\u043A %.0f \u043C\u043C \u043D\u0430 \u0434\u043E\u0441\u043A\u0443.\r\n", info.remainderMm);
+				} else {
+					AppendWideLine(txt, L"\u0423\u043F\u043E\u0440 %d \u043C\u043C \u2014 \u0431\u0435\u0440\u0451\u043C \u043E\u0441\u0442\u0430\u0442\u043E\u043A \u0438\u0437 \u043F\u0430\u0447\u043A\u0438, \u043F\u0438\u043B\u0438\u043C (%d \u0440\u0435\u0437 \u0441 \u043A\u0430\u0436\u0434\u043E\u0439). \u041E\u0441\u0442\u0430\u0442\u043E\u043A \u0432 \u043F\u0430\u0447\u043A\u0443.\r\n", step.stopLength, step.cutsPerBoard);
+				}
+			}
+		}
+		txt += GS::UniString(L"\r\n");
+	}
+	return txt;
+}
+
+} // anonymous
+
+bool PlaceScenarioTextOnFloor(const GS::UniString& instructionsTxt, short floorIndex)
+{
+	if (instructionsTxt.IsEmpty())
+		return true;
+	API_Element element = {};
+	element.header.type = API_TextID;
+	GSErrCode err = ACAPI_Element_GetDefaults(&element, nullptr);
+	if (err != NoError)
+		return false;
+	element.text.head.floorInd = floorIndex;
+	element.text.loc.x = 1.0;
+	element.text.loc.y = 1.0;
+	if (element.text.width < 100.0)
+		element.text.width = 400.0;
+	if (element.text.height < 50.0)
+		element.text.height = 300.0;
+	API_ElementMemo memo = {};
+	GS::UniString contentCopy = instructionsTxt;
+	memo.textContent = &contentCopy;
+	err = ACAPI_Element_Create(&element, &memo);
+	/* Do not call ACAPI_DisposeElemMemoHdls: we did not allocate memo.textContent. */
+	return (err == NoError);
+}
+
+bool ExportCutPlanToExcel(const CuttingStock::SolverResult& result, double slit, short floorIndex)
+{
+	FastProduction::ScenarioData scenarioData;
+	GS::UniString csv = BuildCutPlanCsv(result, slit, &scenarioData);
+	wchar_t pathBuf[MAX_PATH] = L"";
+	OPENFILENAMEW ofn = {};
+	ofn.lStructSize = sizeof(ofn);
+	ofn.lpstrFilter = L"CSV files (*.csv)\0*.csv\0All files (*.*)\0*.*\0";
+	ofn.lpstrFile = pathBuf;
+	ofn.nMaxFile = MAX_PATH;
+	ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
+	ofn.lpstrDefExt = L"csv";
+	if (!GetSaveFileNameW(&ofn))
+		return false;
+
+	if (!WriteUtf8File(pathBuf, csv))
+		return false;
+
+	// Base path without extension for additional files
+	wchar_t basePath[MAX_PATH] = L"";
+	wcscpy_s(basePath, pathBuf);
+	wchar_t* dot = wcsrchr(basePath, L'.');
+	if (dot && dot > basePath)
+		*dot = L'\0';
+
+	wchar_t extraPath[MAX_PATH] = L"";
+
+	// set_list.csv
+	swprintf_s(extraPath, L"%s_set_list.csv", basePath);
+	GS::UniString setListCsv;
+	setListCsv += "BoardW;ScenarioId;StopLength;CutsCount;BoardsCount;OpOrder\r\n";
+	for (UIndex i = 0; i < scenarioData.setListRows.GetSize(); ++i) {
+		const FastProduction::SetListRow& row = scenarioData.setListRows[i];
+		setListCsv += GS::UniString::Printf("%.0f;%s;%d;%d;%d;%d\r\n",
+			row.boardW, row.scenarioId.ToCStr().Get(), row.stopLength, row.cutsCount, row.boardsCount, row.opOrder);
+	}
+	WriteUtf8File(extraPath, setListCsv);
+
+	// set_list_summary.csv
+	swprintf_s(extraPath, L"%s_set_list_summary.csv", basePath);
+	GS::UniString summaryCsv;
+	summaryCsv += "BoardW;StopLength;TotalCuts\r\n";
+	for (UIndex i = 0; i < scenarioData.setListSummaryRows.GetSize(); ++i) {
+		const FastProduction::SetListSummaryRow& row = scenarioData.setListSummaryRows[i];
+		summaryCsv += GS::UniString::Printf("%.0f;%d;%d\r\n", row.boardW, row.stopLength, row.totalCuts);
+	}
+	WriteUtf8File(extraPath, summaryCsv);
+
+	// operator_instructions.txt (Windows-1251 so Notepad shows Cyrillic)
+	swprintf_s(extraPath, L"%s_operator_instructions.txt", basePath);
+	GS::Array<ArchiFrameSummaryRow> summaryRows = CollectArchiFrameSummaryFromSelection();
+	GS::UniString instructionsTxt = BuildOperatorInstructions(scenarioData, result, summaryRows);
+	WriteAnsiFile(extraPath, instructionsTxt);
+
+	// Place scenario text on selected floor (API_TextID) so it displays in Archicad
+	if (floorIndex >= 0) {
+		API_StoryInfo storyInfo = {};
+		if (ACAPI_ProjectSetting_GetStorySettings(&storyInfo) == NoError) {
+			if (floorIndex >= storyInfo.firstStory && floorIndex <= storyInfo.lastStory)
+				PlaceScenarioTextOnFloor(instructionsTxt, floorIndex);
+		}
+	}
+
 	return true;
 }
 
@@ -455,7 +667,7 @@ void DumpArchiFramePlankParamsToReport()
 		ACAPI_WriteReport("No ArchiFramePlank in selection. Select at least one ArchiFramePlank and run again.", true);
 }
 
-bool RunCuttingPlan(double slitMM, double extraLenMM, short /*floorIndex*/)
+bool RunCuttingPlan(double slitMM, double extraLenMM, short floorIndex)
 {
 	double maxStockLength = 0.0;
 	GS::Array<CuttingStock::Part> parts = CollectPartsFromSelection(maxStockLength);
@@ -474,7 +686,7 @@ bool RunCuttingPlan(double slitMM, double extraLenMM, short /*floorIndex*/)
 		params.maxStockLength = baseMax;
 
 	CuttingStock::SolverResult result = CuttingStock::Solve(parts, params);
-	return ExportCutPlanToExcel(result, params.slit);
+	return ExportCutPlanToExcel(result, params.slit, floorIndex);
 }
 
 } // namespace CutPlanBoardHelper

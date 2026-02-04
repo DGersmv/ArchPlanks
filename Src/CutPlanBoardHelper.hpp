@@ -5,6 +5,7 @@
 #include "ACAPinc.h"
 #include "GSRoot.hpp"
 #include "CuttingStockSolver.hpp"
+#include "FastProduction.hpp"
 
 namespace CutPlanBoardHelper {
 
@@ -34,9 +35,12 @@ GS::Array<ArchiFrameSummaryRow> CollectArchiFrameSummaryFromSelection();
 
 CuttingStock::SolverParams DefaultSolverParams();
 
-GS::UniString BuildCutPlanCsv(const CuttingStock::SolverResult& result, double slit);
+GS::UniString BuildCutPlanCsv(const CuttingStock::SolverResult& result, double slit, FastProduction::ScenarioData* outScenarioData = nullptr);
 
-bool ExportCutPlanToExcel(const CuttingStock::SolverResult& result, double slit);
+bool ExportCutPlanToExcel(const CuttingStock::SolverResult& result, double slit, short floorIndex = -1);
+
+/** Place scenario instructions as a Text (Word) element on the given floor. */
+bool PlaceScenarioTextOnFloor(const GS::UniString& instructionsTxt, short floorIndex);
 
 // Высокоуровневая обёртка для запуска алгоритма Cutting Plan из UI
 // slitMM      — толщина пилы, мм (если <= 0, используется значение по умолчанию)
